@@ -1,5 +1,16 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { connectAuthEmulator, getAuth } from 'firebase/auth';
+import {
+  connectAuthEmulator,
+  getAuth,
+  initializeAuth,
+  // getReactNativePersistence is exported by @firebase/auth's react-native
+  // build at runtime, but the `firebase/auth` subpath declares no
+  // react-native condition, so its bundled typings resolve to the web build
+  // and omit it. Remove this line if the upstream typings are ever fixed.
+  // @ts-expect-error -- present at runtime, missing from the web typings
+  getReactNativePersistence,
+} from 'firebase/auth';
 import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
 import { connectStorageEmulator, getStorage } from 'firebase/storage';
 import { connectFunctionsEmulator, getFunctions } from 'firebase/functions';
@@ -13,9 +24,17 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
-export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const isFirstInit = getApps().length === 0;
 
-export const auth = getAuth(app);
+export const app = isFirstInit ? initializeApp(firebaseConfig) : getApp();
+
+// Auth must be initialized with AsyncStorage persistence, otherwise the SDK
+// falls back to in-memory only and the user is signed out on every app
+// restart. initializeAuth can only be called once per app, so reuse the
+// existing instance on Fast Refresh.
+export const auth = isFirstInit
+  ? initializeAuth(app, { persistence: getReactNativePersistence(AsyncStorage) })
+  : getAuth(app);
 export const firestore = getFirestore(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
