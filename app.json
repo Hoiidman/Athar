@@ -29,7 +29,8 @@
           "cameraPermission": "Athar uses your camera to capture family memories.",
           "microphonePermission": "Athar uses your microphone to record voice notes and video sound."
         }
-      ]
+      ],
+      "expo-asset"
     ]
   }
 }
