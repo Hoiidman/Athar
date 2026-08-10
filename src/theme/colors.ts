@@ -12,6 +12,11 @@ export const colors = {
   textSecondary: '#6B6B6B',
   // Text/icons placed on a filled primary or error surface.
   textOnAccent: '#FFFFFF',
+  // Input/card outlines. The lightest grey clearing 3:1 against both
+  // `surface` and `background` — WCAG 1.4.11 requires that for a control's
+  // visible boundary. Anything lighter fails and the field stops reading
+  // as an input.
+  border: '#8A8A8A',
 } as const;
 
 export const darkColors: Record<keyof typeof colors, string> = {
@@ -27,4 +32,6 @@ export const darkColors: Record<keyof typeof colors, string> = {
   // Dark-mode accents are light, so they take dark text rather than white.
   // Revisit alongside dark mode itself (Phase 8) — untested until then.
   textOnAccent: '#121212',
+  // 3.37:1 on `surface`, 3.78:1 on `background` — clears 3:1 on both.
+  border: '#707070',
 };
