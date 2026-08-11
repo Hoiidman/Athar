@@ -13,7 +13,7 @@ import {
 import { Button } from '../../components/Button';
 import { TextInput } from '../../components/TextInput';
 import type { AuthStackParamList } from '../../navigation/AuthNavigator';
-import { signIn } from '../../services/auth';
+import { signIn, signInAsGuest } from '../../services/auth';
 import { colors, minTapTarget, spacing, typography } from '../../theme';
 
 function messageForAuthError(code: string) {
@@ -26,6 +26,8 @@ function messageForAuthError(code: string) {
       return 'That email address is not valid.';
     case 'auth/user-disabled':
       return 'This account has been disabled.';
+    case 'auth/operation-not-allowed':
+      return 'Guest access is unavailable right now.';
     case 'auth/too-many-requests':
       return 'Too many attempts. Try again in a few minutes.';
     case 'auth/network-request-failed':
@@ -42,7 +44,8 @@ export function SignInScreen() {
   const [emailError, setEmailError] = useState<string>();
   const [passwordError, setPasswordError] = useState<string>();
   const [formError, setFormError] = useState<string>();
-  const [submitting, setSubmitting] = useState(false);
+  const [pending, setPending] = useState<'credentials' | 'guest'>();
+  const busy = pending !== undefined;
 
   async function handleSubmit() {
     const trimmedEmail = email.trim();
@@ -55,12 +58,25 @@ export function SignInScreen() {
 
     if (nextEmailError || nextPasswordError) return;
 
-    setSubmitting(true);
+    setPending('credentials');
     try {
       await signIn(trimmedEmail, password);
     } catch (error) {
       setFormError(messageForAuthError((error as { code?: string }).code ?? ''));
-      setSubmitting(false);
+      setPending(undefined);
+    }
+  }
+
+  async function handleGuest() {
+    setEmailError(undefined);
+    setPasswordError(undefined);
+    setFormError(undefined);
+    setPending('guest');
+    try {
+      await signInAsGuest();
+    } catch (error) {
+      setFormError(messageForAuthError((error as { code?: string }).code ?? ''));
+      setPending(undefined);
     }
   }
 
@@ -100,7 +116,7 @@ export function SignInScreen() {
             keyboardType="email-address"
             textContentType="emailAddress"
             returnKeyType="next"
-            editable={!submitting}
+            editable={!busy}
           />
 
           <TextInput
@@ -115,16 +131,35 @@ export function SignInScreen() {
             secureTextEntry
             returnKeyType="go"
             onSubmitEditing={handleSubmit}
-            editable={!submitting}
+            editable={!busy}
           />
 
           <View style={styles.action}>
-            <Button label="Sign in" onPress={handleSubmit} loading={submitting} />
+            <Button
+              label="Sign in"
+              onPress={handleSubmit}
+              loading={pending === 'credentials'}
+              disabled={busy}
+            />
           </View>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <Button
+            label="Continue as guest"
+            variant="secondary"
+            onPress={handleGuest}
+            loading={pending === 'guest'}
+            disabled={busy}
+          />
 
           <Pressable
             onPress={() => navigation.navigate('SignUp')}
-            disabled={submitting}
+            disabled={busy}
             accessibilityRole="link"
             style={styles.link}
           >
@@ -191,6 +226,20 @@ const styles = StyleSheet.create({
   },
   action: {
     marginTop: spacing.xs,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  dividerText: {
+    ...typography.caption,
+    color: colors.textSecondary,
   },
   link: {
     minHeight: minTapTarget,

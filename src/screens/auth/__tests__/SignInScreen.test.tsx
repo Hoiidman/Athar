@@ -1,6 +1,6 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { fireEvent, render } from '@testing-library/react-native';
-import { signIn } from '../../../services/auth';
+import { signIn, signInAsGuest } from '../../../services/auth';
 import { SignInScreen } from '../SignInScreen';
 
 function renderScreen() {
@@ -11,12 +11,14 @@ function renderScreen() {
   );
 }
 
-jest.mock('../../../services/auth', () => ({ signIn: jest.fn() }));
+jest.mock('../../../services/auth', () => ({ signIn: jest.fn(), signInAsGuest: jest.fn() }));
 
 const mockSignIn = signIn as jest.Mock;
+const mockSignInAsGuest = signInAsGuest as jest.Mock;
 
 beforeEach(() => {
   mockSignIn.mockReset();
+  mockSignInAsGuest.mockReset();
 });
 
 describe('SignInScreen', () => {
@@ -50,5 +52,25 @@ describe('SignInScreen', () => {
     await fireEvent.press(getByRole('button', { name: 'Sign in' }));
 
     expect(await findByText('Email or password is incorrect.')).toBeTruthy();
+  });
+
+  it('signs in anonymously without requiring the form', async () => {
+    mockSignInAsGuest.mockResolvedValue({});
+    const { getByRole, queryByText } = await renderScreen();
+
+    await fireEvent.press(getByRole('button', { name: 'Continue as guest' }));
+
+    expect(mockSignInAsGuest).toHaveBeenCalled();
+    expect(mockSignIn).not.toHaveBeenCalled();
+    expect(queryByText('Enter your email.')).toBeFalsy();
+  });
+
+  it('explains when anonymous auth is turned off in the Firebase console', async () => {
+    mockSignInAsGuest.mockRejectedValue({ code: 'auth/operation-not-allowed' });
+    const { findByText, getByRole } = await renderScreen();
+
+    await fireEvent.press(getByRole('button', { name: 'Continue as guest' }));
+
+    expect(await findByText('Guest access is unavailable right now.')).toBeTruthy();
   });
 });
