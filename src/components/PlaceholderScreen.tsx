@@ -1,10 +1,12 @@
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, typography } from '../theme';
+import { colors, spacing, typography } from '../theme';
 
-export function PlaceholderScreen({ title }: { title: string }) {
+export function PlaceholderScreen({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <View style={styles.container}>
       <Text style={styles.text}>{title}</Text>
+      {children}
     </View>
   );
 }
@@ -15,6 +17,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.md,
   },
   text: {
     ...typography.heading,
