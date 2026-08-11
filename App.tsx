@@ -6,10 +6,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootTabNavigator } from './src/navigation/RootTabNavigator';
 import { AuthNavigator } from './src/navigation/AuthNavigator';
 import { useAuth } from './src/hooks/useAuth';
+import { useEnsureUserDocument } from './src/hooks/useEnsureUserDocument';
 import { colors } from './src/theme';
 
 export default function App() {
   const { user, initializing } = useAuth();
+  useEnsureUserDocument(user);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
