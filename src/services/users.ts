@@ -1,0 +1,23 @@
+import type { User } from 'firebase/auth';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { firestore } from './firebase';
+
+function defaultDisplayName(user: User): string {
+  if (user.displayName) return user.displayName;
+  if (user.email) return user.email.split('@')[0] ?? 'Guest';
+  return 'Guest';
+}
+
+export async function ensureUserDocument(user: User): Promise<void> {
+  const ref = doc(firestore, 'users', user.uid);
+  const snapshot = await getDoc(ref);
+  if (snapshot.exists()) return;
+
+  await setDoc(ref, {
+    displayName: defaultDisplayName(user),
+    photoUrl: user.photoURL,
+    familyCircleId: null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
