@@ -1,5 +1,5 @@
-import { PlaceholderScreen } from '../components/PlaceholderScreen';
+import { SignInScreen } from '../screens/auth/SignInScreen';
 
 export function AuthNavigator() {
-  return <PlaceholderScreen title="Sign In" />;
+  return <SignInScreen />;
 }
