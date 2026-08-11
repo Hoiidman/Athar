@@ -1,6 +1,15 @@
+import { NavigationContainer } from '@react-navigation/native';
 import { fireEvent, render } from '@testing-library/react-native';
 import { signIn } from '../../../services/auth';
 import { SignInScreen } from '../SignInScreen';
+
+function renderScreen() {
+  return render(
+    <NavigationContainer>
+      <SignInScreen />
+    </NavigationContainer>,
+  );
+}
 
 jest.mock('../../../services/auth', () => ({ signIn: jest.fn() }));
 
@@ -12,7 +21,7 @@ beforeEach(() => {
 
 describe('SignInScreen', () => {
   it('asks for the missing fields instead of submitting an empty form', async () => {
-    const { getByRole, getByText } = await render(<SignInScreen />);
+    const { getByRole, getByText } = await renderScreen();
 
     await fireEvent.press(getByRole('button', { name: 'Sign in' }));
 
@@ -23,7 +32,7 @@ describe('SignInScreen', () => {
 
   it('signs in with the trimmed email and the password as typed', async () => {
     mockSignIn.mockResolvedValue({});
-    const { getByLabelText, getByRole } = await render(<SignInScreen />);
+    const { getByLabelText, getByRole } = await renderScreen();
 
     await fireEvent.changeText(getByLabelText('Email'), '  layla@example.com  ');
     await fireEvent.changeText(getByLabelText('Password'), ' secret123');
@@ -34,7 +43,7 @@ describe('SignInScreen', () => {
 
   it('shows a readable message when Firebase rejects the credentials', async () => {
     mockSignIn.mockRejectedValue({ code: 'auth/invalid-credential' });
-    const { findByText, getByLabelText, getByRole } = await render(<SignInScreen />);
+    const { findByText, getByLabelText, getByRole } = await renderScreen();
 
     await fireEvent.changeText(getByLabelText('Email'), 'layla@example.com');
     await fireEvent.changeText(getByLabelText('Password'), 'wrong');

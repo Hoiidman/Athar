@@ -1,9 +1,20 @@
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Button } from '../../components/Button';
 import { TextInput } from '../../components/TextInput';
+import type { AuthStackParamList } from '../../navigation/AuthNavigator';
 import { signUp } from '../../services/auth';
-import { colors, spacing, typography } from '../../theme';
+import { colors, minTapTarget, spacing, typography } from '../../theme';
 
 function messageForAuthError(code: string) {
   switch (code) {
@@ -23,6 +34,7 @@ function messageForAuthError(code: string) {
 }
 
 export function SignUpScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -125,6 +137,15 @@ export function SignUpScreen() {
           <View style={styles.action}>
             <Button label="Create account" onPress={handleSubmit} loading={submitting} />
           </View>
+
+          <Pressable
+            onPress={() => navigation.navigate('SignIn')}
+            disabled={submitting}
+            accessibilityRole="link"
+            style={styles.link}
+          >
+            <Text style={styles.linkText}>Already have an account? Sign in</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -186,5 +207,14 @@ const styles = StyleSheet.create({
   },
   action: {
     marginTop: spacing.xs,
+  },
+  link: {
+    minHeight: minTapTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  linkText: {
+    ...typography.label,
+    color: colors.primary,
   },
 });
