@@ -7,6 +7,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -25,6 +26,8 @@ const STRANGER = 'stranger-uid';
 
 const CIRCLE = 'circle-1';
 const CODE = 'K7M2P9XR';
+const OTHER_CIRCLE = 'circle-2';
+const OTHER_CODE = 'A2B3C4D5';
 
 let testEnv: RulesTestEnvironment;
 
@@ -88,6 +91,33 @@ async function seedCircle() {
     await setDoc(doc(db, 'familyCircles', CIRCLE), circleData());
     await setDoc(doc(db, 'familyCircles', CIRCLE, 'members', OWNER), memberData());
     await setDoc(doc(db, 'inviteCodes', CODE), inviteCodeData());
+  });
+}
+
+function joinBatch(db: Firestore, uid: string, circleId: string, code: string | null) {
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'familyCircles', circleId, 'members', uid), {
+    userId: uid,
+    displayName: 'Joiner',
+    role: 'member',
+    inviteCodeUsed: code,
+    joinedAt: serverTimestamp(),
+  });
+  batch.update(doc(db, 'familyCircles', circleId), {
+    memberIds: arrayUnion(uid),
+    updatedAt: serverTimestamp(),
+  });
+  return batch;
+}
+
+async function seedOtherCircle() {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore() as unknown as Firestore;
+    await setDoc(doc(db, 'familyCircles', OTHER_CIRCLE), circleData({ inviteCode: OTHER_CODE }));
+    await setDoc(
+      doc(db, 'inviteCodes', OTHER_CODE),
+      inviteCodeData({ familyCircleId: OTHER_CIRCLE }),
+    );
   });
 }
 
@@ -235,5 +265,126 @@ describe('modifying a family circle', () => {
 
     await assertFails(deleteDoc(doc(db, 'familyCircles', CIRCLE, 'members', OWNER)));
     await assertSucceeds(deleteDoc(doc(db, 'familyCircles', CIRCLE, 'members', JOINER)));
+  });
+});
+
+describe('invite codes', () => {
+  it('lets any signed-in user look up a code', async () => {
+    await seedCircle();
+
+    await assertSucceeds(getDoc(doc(dbFor(STRANGER), 'inviteCodes', CODE)));
+  });
+
+  it('refuses a signed-out lookup', async () => {
+    await seedCircle();
+
+    await assertFails(getDoc(doc(dbFor(), 'inviteCodes', CODE)));
+  });
+
+  it('refuses creating a code for a circle the user does not own', async () => {
+    await seedCircle();
+    const db = dbFor(STRANGER);
+
+    await assertFails(
+      setDoc(doc(db, 'inviteCodes', OTHER_CODE), inviteCodeData({ createdBy: STRANGER })),
+    );
+  });
+
+  it('refuses repointing an existing code at another circle', async () => {
+    await seedCircle();
+    const db = dbFor(OWNER);
+
+    await assertFails(updateDoc(doc(db, 'inviteCodes', CODE), { familyCircleId: OTHER_CIRCLE }));
+  });
+
+  it('refuses deleting a code', async () => {
+    await seedCircle();
+
+    await assertFails(deleteDoc(doc(dbFor(OWNER), 'inviteCodes', CODE)));
+  });
+});
+
+describe('joining a family circle', () => {
+  it('lets a user join when they supply the code that maps to the circle', async () => {
+    await seedCircle();
+
+    await assertSucceeds(joinBatch(dbFor(JOINER), JOINER, CIRCLE, CODE).commit());
+  });
+
+  it('refuses a signed-out join', async () => {
+    await seedCircle();
+
+    await assertFails(joinBatch(dbFor(), JOINER, CIRCLE, CODE).commit());
+  });
+
+  it('refuses joining with no invite code at all', async () => {
+    await seedCircle();
+
+    await assertFails(joinBatch(dbFor(JOINER), JOINER, CIRCLE, null).commit());
+  });
+
+  it('refuses joining with a code that does not exist', async () => {
+    await seedCircle();
+
+    await assertFails(joinBatch(dbFor(JOINER), JOINER, CIRCLE, 'WRONGCOD').commit());
+  });
+
+  it('refuses a code that belongs to a different circle', async () => {
+    await seedCircle();
+    await seedOtherCircle();
+
+    await assertFails(joinBatch(dbFor(JOINER), JOINER, CIRCLE, OTHER_CODE).commit());
+  });
+
+  it('refuses adding somebody else to a circle', async () => {
+    await seedCircle();
+
+    await assertFails(joinBatch(dbFor(JOINER), STRANGER, CIRCLE, CODE).commit());
+  });
+
+  it('refuses claiming the owner role when joining', async () => {
+    await seedCircle();
+    const db = dbFor(JOINER);
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'familyCircles', CIRCLE, 'members', JOINER), {
+      userId: JOINER,
+      displayName: 'Joiner',
+      role: 'owner',
+      inviteCodeUsed: CODE,
+      joinedAt: serverTimestamp(),
+    });
+    batch.update(doc(db, 'familyCircles', CIRCLE), {
+      memberIds: arrayUnion(JOINER),
+      updatedAt: serverTimestamp(),
+    });
+
+    await assertFails(batch.commit());
+  });
+
+  it('refuses adding yourself to memberIds without a member doc', async () => {
+    await seedCircle();
+    const db = dbFor(JOINER);
+
+    await assertFails(
+      updateDoc(doc(db, 'familyCircles', CIRCLE), {
+        memberIds: arrayUnion(JOINER),
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('allows a member doc without the memberIds update, since memberIds is not authoritative', async () => {
+    await seedCircle();
+    const db = dbFor(JOINER);
+
+    await assertSucceeds(
+      setDoc(doc(db, 'familyCircles', CIRCLE, 'members', JOINER), {
+        userId: JOINER,
+        displayName: 'Joiner',
+        role: 'member',
+        inviteCodeUsed: CODE,
+        joinedAt: serverTimestamp(),
+      }),
+    );
   });
 });
