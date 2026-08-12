@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView } from 'expo-camera';
 import { useAudioRecorder, RecordingPresets } from 'expo-audio';
@@ -35,6 +35,7 @@ export function CaptureScreen() {
 
   const cameraRef = useRef<CameraView>(null);
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const shutterOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (cameraPermission && !cameraPermission.granted && cameraPermission.canAskAgain) {
@@ -48,6 +49,11 @@ export function CaptureScreen() {
   }
 
   async function handleTakePhoto() {
+    Animated.sequence([
+      Animated.timing(shutterOpacity, { toValue: 1, duration: 60, useNativeDriver: true }),
+      Animated.timing(shutterOpacity, { toValue: 0, duration: 240, useNativeDriver: true }),
+    ]).start();
+
     const photo = await cameraRef.current?.takePictureAsync();
     if (photo) setLastCaptureUri(photo.uri);
   }
@@ -113,24 +119,29 @@ export function CaptureScreen() {
         />
       )}
 
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, styles.shutter, { opacity: shutterOpacity }]}
+      />
+
       <SafeAreaView style={styles.topBar} edges={['top']}>
         <Pressable onPress={cycleFlash} style={styles.iconButton} hitSlop={10}>
-          <Ionicons name={FLASH_ICONS[flash]} size={24} color={colors.surface} />
+          <Ionicons name={FLASH_ICONS[flash]} size={30} color={colors.surface} />
         </Pressable>
         <Pressable
           onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}
           style={styles.iconButton}
           hitSlop={10}
         >
-          <Ionicons name="camera-reverse-outline" size={26} color={colors.surface} />
+          <Ionicons name="camera-reverse-outline" size={32} color={colors.surface} />
         </Pressable>
       </SafeAreaView>
 
       <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
         <Pressable style={styles.albumButton} onPress={() => setAlbumPickerVisible(true)}>
-          <Ionicons name="albums-outline" size={14} color={colors.surface} />
+          <Ionicons name="albums-outline" size={16} color={colors.surface} />
           <Text style={styles.albumLabel}>{albumLabel}</Text>
-          <Ionicons name="chevron-down" size={14} color={colors.surface} />
+          <Ionicons name="chevron-down" size={16} color={colors.surface} />
         </Pressable>
 
         <View style={styles.captureRow}>
@@ -141,7 +152,7 @@ export function CaptureScreen() {
           >
             <Ionicons
               name={voiceMode ? 'mic' : 'mic-outline'}
-              size={28}
+              size={34}
               color={voiceMode ? colors.primary : colors.surface}
             />
           </Pressable>
@@ -167,7 +178,7 @@ export function CaptureScreen() {
   );
 }
 
-const THUMBNAIL_SIZE = 48;
+const THUMBNAIL_SIZE = 58;
 
 const styles = StyleSheet.create({
   container: {
@@ -216,6 +227,9 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
   },
+  shutter: {
+    backgroundColor: colors.surface,
+  },
   topBar: {
     position: 'absolute',
     top: 0,
@@ -223,7 +237,7 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     paddingTop: spacing.xs,
   },
   bottomBar: {
@@ -232,8 +246,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingBottom: spacing.sm,
+    gap: 8,
+    paddingBottom: 4,
   },
   albumButton: {
     flexDirection: 'row',
@@ -241,7 +255,7 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: 'rgba(0,0,0,0.4)',
     paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 20,
   },
   albumLabel: {
@@ -253,11 +267,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.md,
   },
   iconButton: {
-    width: 44,
-    height: 44,
+    width: 52,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
   },
