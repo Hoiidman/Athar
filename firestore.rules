@@ -3,8 +3,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
     function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     function userFields() {
@@ -37,6 +41,127 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
 
       allow delete: if false;
+    }
+
+    function circleFields() {
+      return ['name', 'inviteCode', 'ownerId', 'memberIds', 'createdAt', 'updatedAt'];
+    }
+
+    function isValidCircle(data) {
+      return data.keys().hasOnly(circleFields())
+        && data.keys().hasAll(circleFields())
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 60
+        && data.inviteCode is string
+        && data.ownerId is string
+        && data.memberIds is list;
+    }
+
+    function memberFields() {
+      return ['userId', 'displayName', 'role', 'inviteCodeUsed', 'joinedAt'];
+    }
+
+    function isValidMember(data) {
+      return data.keys().hasOnly(memberFields())
+        && data.keys().hasAll(memberFields())
+        && data.userId is string
+        && data.displayName is string
+        && data.displayName.size() > 0
+        && data.displayName.size() <= 80;
+    }
+
+    match /familyCircles/{circleId} {
+
+      function isMember() {
+        return isSignedIn()
+          && exists(/databases/$(database)/documents/familyCircles/$(circleId)/members/$(request.auth.uid));
+      }
+
+      function isRename() {
+        return resource.data.ownerId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'updatedAt'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 60
+          && request.resource.data.updatedAt == request.time;
+      }
+
+      function isJoin() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds', 'updatedAt'])
+          && request.resource.data.memberIds == resource.data.memberIds.concat([request.auth.uid])
+          && request.resource.data.updatedAt == request.time
+          && getAfter(/databases/$(database)/documents/familyCircles/$(circleId)/members/$(request.auth.uid)).data.inviteCodeUsed is string;
+      }
+
+      allow get: if isMember();
+
+      allow list: if false;
+
+      allow create: if isSignedIn()
+        && isValidCircle(request.resource.data)
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.memberIds == [request.auth.uid]
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      allow update: if isSignedIn()
+        && isValidCircle(request.resource.data)
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.inviteCode == resource.data.inviteCode
+        && request.resource.data.createdAt == resource.data.createdAt
+        && (isRename() || isJoin());
+
+      allow delete: if false;
+
+      match /members/{userId} {
+
+        function isFoundingOwner() {
+          return request.resource.data.role == 'owner'
+            && request.resource.data.inviteCodeUsed == null
+            && getAfter(/databases/$(database)/documents/familyCircles/$(circleId)).data.ownerId == request.auth.uid;
+        }
+
+        function knowsInviteCode() {
+          return request.resource.data.role == 'member'
+            && request.resource.data.inviteCodeUsed is string
+            && exists(/databases/$(database)/documents/inviteCodes/$(request.resource.data.inviteCodeUsed))
+            && get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.inviteCodeUsed)).data.familyCircleId == circleId;
+        }
+
+        allow get, list: if isSignedIn()
+          && exists(/databases/$(database)/documents/familyCircles/$(circleId)/members/$(request.auth.uid));
+
+        allow create: if isOwner(userId)
+          && isValidMember(request.resource.data)
+          && request.resource.data.userId == userId
+          && request.resource.data.joinedAt == request.time
+          && (isFoundingOwner() || knowsInviteCode());
+
+        allow update: if false;
+
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    function inviteCodeFields() {
+      return ['familyCircleId', 'createdBy', 'createdAt'];
+    }
+
+    match /inviteCodes/{code} {
+      allow get: if isSignedIn();
+
+      allow list: if false;
+
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(inviteCodeFields())
+        && request.resource.data.keys().hasAll(inviteCodeFields())
+        && request.resource.data.familyCircleId is string
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && getAfter(/databases/$(database)/documents/familyCircles/$(request.resource.data.familyCircleId)).data.ownerId == request.auth.uid;
+
+      allow update, delete: if false;
     }
 
     match /{document=**} {
