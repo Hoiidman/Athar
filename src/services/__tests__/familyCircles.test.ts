@@ -1,7 +1,12 @@
 import { getRandomBytes } from 'expo-crypto';
 import type { User } from 'firebase/auth';
-import { arrayUnion, doc, getDoc, runTransaction, writeBatch } from 'firebase/firestore';
-import { FamilyCircleError, createFamilyCircle, joinFamilyCircle } from '../familyCircles';
+import { arrayUnion, doc, getDoc, getDocs, runTransaction, writeBatch } from 'firebase/firestore';
+import {
+  FamilyCircleError,
+  createFamilyCircle,
+  joinFamilyCircle,
+  listFamilyCircleMembers,
+} from '../familyCircles';
 
 jest.mock('../firebase', () => ({ firestore: { __mockFirestore: true } }));
 
@@ -12,6 +17,7 @@ jest.mock('firebase/firestore', () => ({
   collection: jest.fn((_db: unknown, path: string) => ({ __collection: path })),
   doc: jest.fn(),
   getDoc: jest.fn(),
+  getDocs: jest.fn(),
   runTransaction: jest.fn(),
   serverTimestamp: jest.fn(() => '__ts'),
   writeBatch: jest.fn(),
@@ -165,7 +171,11 @@ describe('joinFamilyCircle', () => {
 
   it('accepts a code typed in lowercase with separators', async () => {
     joinReads();
-    const batch = { set: jest.fn(), update: jest.fn(), commit: jest.fn().mockResolvedValue(undefined) };
+    const batch = {
+      set: jest.fn(),
+      update: jest.fn(),
+      commit: jest.fn().mockResolvedValue(undefined),
+    };
     mockWriteBatch.mockReturnValue(batch);
 
     const circleId = await joinFamilyCircle(user, ' k7m2-p9xr ');
@@ -197,13 +207,50 @@ describe('joinFamilyCircle', () => {
 
   it('adds the member doc and the memberIds update in one batch', async () => {
     joinReads();
-    const batch = { set: jest.fn(), update: jest.fn(), commit: jest.fn().mockResolvedValue(undefined) };
+    const batch = {
+      set: jest.fn(),
+      update: jest.fn(),
+      commit: jest.fn().mockResolvedValue(undefined),
+    };
     mockWriteBatch.mockReturnValue(batch);
 
     await joinFamilyCircle(user, 'K7M2P9XR');
 
     expect(mockWriteBatch).toHaveBeenCalledTimes(1);
     expect(batch.commit).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('listFamilyCircleMembers', () => {
+  it('converts joinedAt to millis and sorts oldest first', async () => {
+    const mockGetDocs = getDocs as jest.Mock;
+    mockGetDocs.mockResolvedValue({
+      docs: [
+        {
+          data: () => ({
+            userId: 'user-2',
+            displayName: 'Sami',
+            role: 'member',
+            inviteCodeUsed: 'K7M2P9XR',
+            joinedAt: { toMillis: () => 200 },
+          }),
+        },
+        {
+          data: () => ({
+            userId: 'user-1',
+            displayName: 'Layla',
+            role: 'owner',
+            inviteCodeUsed: null,
+            joinedAt: { toMillis: () => 100 },
+          }),
+        },
+      ],
+    });
+
+    const members = await listFamilyCircleMembers('circle-9');
+
+    expect(members.map((m) => m.userId)).toEqual(['user-1', 'user-2']);
+    expect(members[0]?.joinedAt).toBe(100);
   });
 });
 

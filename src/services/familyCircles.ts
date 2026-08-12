@@ -4,15 +4,18 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   runTransaction,
   serverTimestamp,
   writeBatch,
+  type Timestamp,
 } from 'firebase/firestore';
 import {
   generateUniqueInviteCode,
   isValidInviteCode,
   normalizeInviteCode,
 } from '../utils/inviteCode';
+import type { FamilyCircleMember } from '../types/familyCircle';
 import { firestore } from './firebase';
 import { defaultDisplayName } from './users';
 
@@ -44,10 +47,7 @@ async function assertNotAlreadyInCircle(user: User) {
   }
 }
 
-export async function createFamilyCircle(
-  user: User,
-  name: string,
-): Promise<CreatedFamilyCircle> {
+export async function createFamilyCircle(user: User, name: string): Promise<CreatedFamilyCircle> {
   const trimmedName = name.trim();
   if (!trimmedName || trimmedName.length > 60) {
     throw new FamilyCircleError('invalid-name');
@@ -139,4 +139,17 @@ export async function joinFamilyCircle(user: User, rawCode: string): Promise<str
 
   await batch.commit();
   return circleId;
+}
+
+export async function listFamilyCircleMembers(circleId: string): Promise<FamilyCircleMember[]> {
+  const snapshot = await getDocs(collection(firestore, 'familyCircles', circleId, 'members'));
+
+  return snapshot.docs
+    .map((memberDoc) => {
+      const data = memberDoc.data() as Omit<FamilyCircleMember, 'joinedAt'> & {
+        joinedAt: Timestamp;
+      };
+      return { ...data, joinedAt: data.joinedAt.toMillis() };
+    })
+    .sort((a, b) => a.joinedAt - b.joinedAt);
 }

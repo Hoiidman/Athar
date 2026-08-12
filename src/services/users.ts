@@ -21,3 +21,9 @@ export async function ensureUserDocument(user: User): Promise<void> {
     updatedAt: serverTimestamp(),
   });
 }
+
+export async function getFamilyCircleId(uid: string): Promise<string | null> {
+  const snapshot = await getDoc(doc(firestore, 'users', uid));
+  if (!snapshot.exists()) return null;
+  return (snapshot.data().familyCircleId as string | null) ?? null;
+}
