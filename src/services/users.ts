@@ -2,7 +2,7 @@ import type { User } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { firestore } from './firebase';
 
-function defaultDisplayName(user: User): string {
+export function defaultDisplayName(user: User): string {
   if (user.displayName) return user.displayName;
   if (user.email) return user.email.split('@')[0] ?? 'Guest';
   return 'Guest';
