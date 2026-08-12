@@ -32,10 +32,12 @@ export function CaptureScreen() {
   const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
   const [albumPickerVisible, setAlbumPickerVisible] = useState(false);
   const [lastCaptureUri, setLastCaptureUri] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
 
   const cameraRef = useRef<CameraView>(null);
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const shutterOpacity = useRef(new Animated.Value(0)).current;
+  const chromeOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (cameraPermission && !cameraPermission.granted && cameraPermission.canAskAgain) {
@@ -60,6 +62,13 @@ export function CaptureScreen() {
 
   async function handleStartRecording() {
     setCameraMode('video');
+    setIsRecording(true);
+    Animated.timing(chromeOpacity, {
+      toValue: 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+
     setTimeout(async () => {
       const video = await cameraRef.current?.recordAsync();
       if (video) setLastCaptureUri(video.uri);
@@ -69,6 +78,12 @@ export function CaptureScreen() {
   function handleStopRecording() {
     cameraRef.current?.stopRecording();
     setCameraMode('picture');
+    setIsRecording(false);
+    Animated.timing(chromeOpacity, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
   }
 
   async function handleVoicePressIn() {
@@ -138,24 +153,34 @@ export function CaptureScreen() {
       </SafeAreaView>
 
       <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
-        <Pressable style={styles.albumButton} onPress={() => setAlbumPickerVisible(true)}>
-          <Ionicons name="albums-outline" size={16} color={colors.surface} />
-          <Text style={styles.albumLabel}>{albumLabel}</Text>
-          <Ionicons name="chevron-down" size={16} color={colors.surface} />
-        </Pressable>
+        <Animated.View
+          style={{ opacity: chromeOpacity }}
+          pointerEvents={isRecording ? 'none' : 'auto'}
+        >
+          <Pressable style={styles.albumButton} onPress={() => setAlbumPickerVisible(true)}>
+            <Ionicons name="albums-outline" size={16} color={colors.surface} />
+            <Text style={styles.albumLabel}>{albumLabel}</Text>
+            <Ionicons name="chevron-down" size={16} color={colors.surface} />
+          </Pressable>
+        </Animated.View>
 
         <View style={styles.captureRow}>
-          <Pressable
-            onPress={() => setVoiceMode((v) => !v)}
-            style={styles.iconButton}
-            hitSlop={10}
+          <Animated.View
+            style={{ opacity: chromeOpacity }}
+            pointerEvents={isRecording ? 'none' : 'auto'}
           >
-            <Ionicons
-              name={voiceMode ? 'mic' : 'mic-outline'}
-              size={34}
-              color={voiceMode ? colors.primary : colors.surface}
-            />
-          </Pressable>
+            <Pressable
+              onPress={() => setVoiceMode((v) => !v)}
+              style={styles.iconButton}
+              hitSlop={10}
+            >
+              <Ionicons
+                name={voiceMode ? 'mic' : 'mic-outline'}
+                size={34}
+                color={voiceMode ? colors.primary : colors.surface}
+              />
+            </Pressable>
+          </Animated.View>
 
           <CaptureButton
             onTakePhoto={handleTakePhoto}
@@ -163,13 +188,18 @@ export function CaptureScreen() {
             onStopRecording={handleStopRecording}
           />
 
-          <Pressable style={styles.thumbnailButton}>
-            {lastCaptureUri ? (
-              <Image source={{ uri: lastCaptureUri }} style={styles.thumbnail} />
-            ) : (
-              <View style={styles.thumbnailPlaceholder} />
-            )}
-          </Pressable>
+          <Animated.View
+            style={{ opacity: chromeOpacity }}
+            pointerEvents={isRecording ? 'none' : 'auto'}
+          >
+            <Pressable style={styles.thumbnailButton}>
+              {lastCaptureUri ? (
+                <Image source={{ uri: lastCaptureUri }} style={styles.thumbnail} />
+              ) : (
+                <View style={styles.thumbnailPlaceholder} />
+              )}
+            </Pressable>
+          </Animated.View>
         </View>
       </SafeAreaView>
 
