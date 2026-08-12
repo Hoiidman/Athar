@@ -44,7 +44,7 @@ export function CaptureScreen() {
   }, [cameraPermission]);
 
   function cycleFlash() {
-    setFlash((f) => FLASH_CYCLE[(FLASH_CYCLE.indexOf(f) + 1) % FLASH_CYCLE.length]);
+    setFlash((f) => FLASH_CYCLE[(FLASH_CYCLE.indexOf(f) + 1) % FLASH_CYCLE.length] ?? 'auto');
   }
 
   async function handleTakePhoto() {
@@ -110,7 +110,6 @@ export function CaptureScreen() {
           facing={facing}
           flash={flash}
           mode={cameraMode}
-          isPinchToZoomEnabled
         />
       )}
 
