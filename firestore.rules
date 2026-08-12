@@ -103,7 +103,8 @@ service cloud.firestore {
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.memberIds == [request.auth.uid]
         && request.resource.data.createdAt == request.time
-        && request.resource.data.updatedAt == request.time;
+        && request.resource.data.updatedAt == request.time
+        && getAfter(/databases/$(database)/documents/familyCircles/$(circleId)/members/$(request.auth.uid)).data.role == 'owner';
 
       allow update: if isSignedIn()
         && isValidCircle(request.resource.data)
