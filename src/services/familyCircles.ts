@@ -20,7 +20,8 @@ export type FamilyCircleErrorCode =
   | 'invalid-name'
   | 'invalid-code'
   | 'code-not-found'
-  | 'code-generation-failed';
+  | 'code-generation-failed'
+  | 'already-in-circle';
 
 export class FamilyCircleError extends Error {
   constructor(readonly code: FamilyCircleErrorCode) {
@@ -36,6 +37,13 @@ export interface CreatedFamilyCircle {
   inviteCode: string;
 }
 
+async function assertNotAlreadyInCircle(user: User) {
+  const snapshot = await getDoc(doc(firestore, 'users', user.uid));
+  if (snapshot.exists() && snapshot.data().familyCircleId) {
+    throw new FamilyCircleError('already-in-circle');
+  }
+}
+
 export async function createFamilyCircle(
   user: User,
   name: string,
@@ -44,6 +52,8 @@ export async function createFamilyCircle(
   if (!trimmedName || trimmedName.length > 60) {
     throw new FamilyCircleError('invalid-name');
   }
+
+  await assertNotAlreadyInCircle(user);
 
   const circleRef = doc(collection(firestore, 'familyCircles'));
   const displayName = defaultDisplayName(user);
@@ -75,6 +85,10 @@ export async function createFamilyCircle(
           createdBy: user.uid,
           createdAt: serverTimestamp(),
         });
+        transaction.update(doc(firestore, 'users', user.uid), {
+          familyCircleId: circleRef.id,
+          updatedAt: serverTimestamp(),
+        });
       });
       return true;
     } catch (error) {
@@ -99,6 +113,8 @@ export async function joinFamilyCircle(user: User, rawCode: string): Promise<str
   const code = normalizeInviteCode(rawCode);
   if (!isValidInviteCode(code)) throw new FamilyCircleError('invalid-code');
 
+  await assertNotAlreadyInCircle(user);
+
   const codeSnapshot = await getDoc(doc(firestore, 'inviteCodes', code));
   if (!codeSnapshot.exists()) throw new FamilyCircleError('code-not-found');
 
@@ -114,6 +130,10 @@ export async function joinFamilyCircle(user: User, rawCode: string): Promise<str
   });
   batch.update(doc(firestore, 'familyCircles', circleId), {
     memberIds: arrayUnion(user.uid),
+    updatedAt: serverTimestamp(),
+  });
+  batch.update(doc(firestore, 'users', user.uid), {
+    familyCircleId: circleId,
     updatedAt: serverTimestamp(),
   });
 

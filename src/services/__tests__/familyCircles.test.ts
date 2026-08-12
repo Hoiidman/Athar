@@ -40,23 +40,39 @@ const mockDoc = doc as jest.Mock;
 const user = { uid: 'user-1', displayName: 'Layla', email: null, photoURL: null } as User;
 
 function transactionSpy(existingCodes: string[] = []) {
-  const sets: { path: string; data: Record<string, unknown> }[] = [];
+  const writes: { path: string; data: Record<string, unknown>; kind: 'set' | 'update' }[] = [];
   mockRunTransaction.mockImplementation(async (_db, updateFn) => {
     await updateFn({
       get: async (ref: { __path: string }) => ({
         exists: () => existingCodes.some((code) => ref.__path.endsWith(code)),
       }),
       set: (ref: { __path: string }, data: Record<string, unknown>) =>
-        sets.push({ path: ref.__path, data }),
+        writes.push({ path: ref.__path, data, kind: 'set' }),
+      update: (ref: { __path: string }, data: Record<string, unknown>) =>
+        writes.push({ path: ref.__path, data, kind: 'update' }),
     });
   });
-  return sets;
+  return writes;
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockDoc.mockImplementation(fakeDoc);
+  mockGetDoc.mockResolvedValue({ exists: () => true, data: () => ({ familyCircleId: null }) });
 });
+
+function userAlreadyInCircle() {
+  mockGetDoc.mockResolvedValueOnce({
+    exists: () => true,
+    data: () => ({ familyCircleId: 'existing-circle' }),
+  });
+}
+
+function joinReads(circleId = 'circle-9') {
+  mockGetDoc
+    .mockResolvedValueOnce({ exists: () => true, data: () => ({ familyCircleId: null }) })
+    .mockResolvedValueOnce({ exists: () => true, data: () => ({ familyCircleId: circleId }) });
+}
 
 describe('createFamilyCircle', () => {
   it('rejects an empty name before touching Firestore', async () => {
@@ -76,7 +92,14 @@ describe('createFamilyCircle', () => {
     const result = await createFamilyCircle(user, '  The Hennawis  ');
 
     expect(result).toEqual({ id: 'new-circle-id', inviteCode: CODE_A });
-    expect(sets).toHaveLength(3);
+    expect(sets.filter((w) => w.kind === 'set')).toHaveLength(3);
+    expect(sets).toContainEqual(
+      expect.objectContaining({
+        kind: 'update',
+        path: 'users/user-1',
+        data: expect.objectContaining({ familyCircleId: 'new-circle-id' }),
+      }),
+    );
 
     const circle = sets.find((s) => s.path === 'familyCircles');
     expect(circle?.data).toMatchObject({
@@ -141,10 +164,7 @@ describe('joinFamilyCircle', () => {
   });
 
   it('accepts a code typed in lowercase with separators', async () => {
-    mockGetDoc.mockResolvedValue({
-      exists: () => true,
-      data: () => ({ familyCircleId: 'circle-9' }),
-    });
+    joinReads();
     const batch = { set: jest.fn(), update: jest.fn(), commit: jest.fn().mockResolvedValue(undefined) };
     mockWriteBatch.mockReturnValue(batch);
 
@@ -166,11 +186,17 @@ describe('joinFamilyCircle', () => {
     expect(batch.commit).toHaveBeenCalled();
   });
 
-  it('adds the member doc and the memberIds update in one batch', async () => {
-    mockGetDoc.mockResolvedValue({
-      exists: () => true,
-      data: () => ({ familyCircleId: 'circle-9' }),
+  it('refuses to join a second circle while already in one', async () => {
+    userAlreadyInCircle();
+
+    await expect(joinFamilyCircle(user, 'K7M2P9XR')).rejects.toMatchObject({
+      code: 'already-in-circle',
     });
+    expect(mockWriteBatch).not.toHaveBeenCalled();
+  });
+
+  it('adds the member doc and the memberIds update in one batch', async () => {
+    joinReads();
     const batch = { set: jest.fn(), update: jest.fn(), commit: jest.fn().mockResolvedValue(undefined) };
     mockWriteBatch.mockReturnValue(batch);
 
@@ -183,10 +209,7 @@ describe('joinFamilyCircle', () => {
 
 describe('arrayUnion usage', () => {
   it('adds only the joining user to memberIds', async () => {
-    mockGetDoc.mockResolvedValue({
-      exists: () => true,
-      data: () => ({ familyCircleId: 'circle-9' }),
-    });
+    joinReads();
     mockWriteBatch.mockReturnValue({
       set: jest.fn(),
       update: jest.fn(),
