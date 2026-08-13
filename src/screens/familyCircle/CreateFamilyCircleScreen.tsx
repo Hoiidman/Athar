@@ -21,9 +21,14 @@ function messageForError(error: unknown) {
 interface CreateFamilyCircleScreenProps {
   user: User;
   onCreated?: (circleId: string) => void;
+  onSwitchToJoin?: () => void;
 }
 
-export function CreateFamilyCircleScreen({ user, onCreated }: CreateFamilyCircleScreenProps) {
+export function CreateFamilyCircleScreen({
+  user,
+  onCreated,
+  onSwitchToJoin,
+}: CreateFamilyCircleScreenProps) {
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState<string>();
   const [formError, setFormError] = useState<string>();
@@ -102,6 +107,14 @@ export function CreateFamilyCircleScreen({ user, onCreated }: CreateFamilyCircle
 
           <View style={styles.action}>
             <Button label="Create circle" onPress={handleSubmit} loading={submitting} />
+            {onSwitchToJoin ? (
+              <Button
+                label="I have an invite code"
+                variant="secondary"
+                onPress={onSwitchToJoin}
+                disabled={submitting}
+              />
+            ) : null}
           </View>
         </View>
       </ScrollView>
@@ -158,6 +171,7 @@ const styles = StyleSheet.create({
   },
   action: {
     marginTop: spacing.xs,
+    gap: spacing.xs,
   },
   codeCard: {
     backgroundColor: colors.surface,

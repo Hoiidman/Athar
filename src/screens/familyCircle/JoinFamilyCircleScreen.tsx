@@ -24,9 +24,14 @@ function messageForError(error: unknown) {
 interface JoinFamilyCircleScreenProps {
   user: User;
   onJoined?: (circleId: string) => void;
+  onSwitchToCreate?: () => void;
 }
 
-export function JoinFamilyCircleScreen({ user, onJoined }: JoinFamilyCircleScreenProps) {
+export function JoinFamilyCircleScreen({
+  user,
+  onJoined,
+  onSwitchToCreate,
+}: JoinFamilyCircleScreenProps) {
   const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState<string>();
   const [formError, setFormError] = useState<string>();
@@ -90,6 +95,14 @@ export function JoinFamilyCircleScreen({ user, onJoined }: JoinFamilyCircleScree
 
           <View style={styles.action}>
             <Button label="Join circle" onPress={handleSubmit} loading={submitting} />
+            {onSwitchToCreate ? (
+              <Button
+                label="Start a new circle"
+                variant="secondary"
+                onPress={onSwitchToCreate}
+                disabled={submitting}
+              />
+            ) : null}
           </View>
         </View>
       </ScrollView>
@@ -140,5 +153,6 @@ const styles = StyleSheet.create({
   },
   action: {
     marginTop: spacing.xs,
+    gap: spacing.xs,
   },
 });
