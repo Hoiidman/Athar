@@ -266,6 +266,22 @@ describe('modifying a family circle', () => {
     await assertFails(deleteDoc(doc(db, 'familyCircles', CIRCLE, 'members', OWNER)));
     await assertSucceeds(deleteDoc(doc(db, 'familyCircles', CIRCLE, 'members', JOINER)));
   });
+
+  it('lets a member rename only themselves, and change nothing else', async () => {
+    await seedCircle();
+    await addMember(JOINER);
+    const db = dbFor(JOINER);
+    const own = doc(db, 'familyCircles', CIRCLE, 'members', JOINER);
+
+    await assertSucceeds(updateDoc(own, { displayName: 'Sami Hennawi' }));
+
+    await assertFails(updateDoc(own, { role: 'owner' }));
+    await assertFails(updateDoc(own, { displayName: 'Sami', role: 'owner' }));
+    await assertFails(updateDoc(own, { displayName: '' }));
+    await assertFails(
+      updateDoc(doc(db, 'familyCircles', CIRCLE, 'members', OWNER), { displayName: 'Hijacked' }),
+    );
+  });
 });
 
 describe('invite codes', () => {
