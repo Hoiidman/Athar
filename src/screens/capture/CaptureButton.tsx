@@ -1,24 +1,39 @@
-import { useRef } from 'react';
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, PanResponder, StyleSheet, View } from 'react-native';
 import { colors } from '../../theme';
 
 const BUTTON_SIZE = 88;
 const RING_SIZE = 116;
 const STOP_SIZE = 34;
+const HOLD_DELAY = 350;
 
 interface Props {
   onTakePhoto: () => void;
   onStartRecording: () => void;
   onStopRecording: () => void;
+  onZoomDrag: (dy: number) => void;
 }
 
-export function CaptureButton({ onTakePhoto, onStartRecording, onStopRecording }: Props) {
+export function CaptureButton({
+  onTakePhoto,
+  onStartRecording,
+  onStopRecording,
+  onZoomDrag,
+}: Props) {
   const isRecording = useRef(false);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ringOpacity = useRef(new Animated.Value(0)).current;
   const ringScale = useRef(new Animated.Value(1)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
   const stopProgress = useRef(new Animated.Value(0)).current;
   const loopRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+      loopRef.current?.stop();
+    };
+  }, []);
 
   function startAnim() {
     Animated.parallel([
@@ -61,7 +76,7 @@ export function CaptureButton({ onTakePhoto, onStartRecording, onStopRecording }
     ]).start();
   }
 
-  function handlePress() {
+  function punch() {
     Animated.sequence([
       Animated.timing(buttonScale, { toValue: 0.86, duration: 70, useNativeDriver: true }),
       Animated.spring(buttonScale, {
@@ -71,25 +86,67 @@ export function CaptureButton({ onTakePhoto, onStartRecording, onStopRecording }
         useNativeDriver: true,
       }),
     ]).start();
-    onTakePhoto();
   }
 
-  function handlePressIn() {
-    Animated.timing(buttonScale, { toValue: 0.93, duration: 110, useNativeDriver: true }).start();
-  }
+  const responder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      // The finger regularly leaves the button while dragging to zoom, and a
+      // parent stealing the touch there would cut the recording short.
+      onPanResponderTerminationRequest: () => false,
 
-  function handleLongPress() {
-    isRecording.current = true;
-    startAnim();
-    onStartRecording();
-  }
+      onPanResponderGrant: () => {
+        Animated.timing(buttonScale, {
+          toValue: 0.93,
+          duration: 110,
+          useNativeDriver: true,
+        }).start();
 
-  function handlePressOut() {
-    if (!isRecording.current) return;
-    isRecording.current = false;
-    stopAnim();
-    onStopRecording();
-  }
+        holdTimer.current = setTimeout(() => {
+          isRecording.current = true;
+          startAnim();
+          onStartRecording();
+        }, HOLD_DELAY);
+      },
+
+      onPanResponderMove: (_event, gesture) => {
+        if (isRecording.current) onZoomDrag(gesture.dy);
+      },
+
+      onPanResponderRelease: () => {
+        if (holdTimer.current) clearTimeout(holdTimer.current);
+
+        if (isRecording.current) {
+          isRecording.current = false;
+          stopAnim();
+          onStopRecording();
+          return;
+        }
+
+        punch();
+        onTakePhoto();
+      },
+
+      onPanResponderTerminate: () => {
+        if (holdTimer.current) clearTimeout(holdTimer.current);
+
+        if (isRecording.current) {
+          isRecording.current = false;
+          stopAnim();
+          onStopRecording();
+          return;
+        }
+
+        Animated.spring(buttonScale, {
+          toValue: 1,
+          friction: 6,
+          tension: 120,
+          useNativeDriver: true,
+        }).start();
+      },
+    }),
+  ).current;
 
   const stopScale = stopProgress.interpolate({
     inputRange: [0, 1],
@@ -101,22 +158,15 @@ export function CaptureButton({ onTakePhoto, onStartRecording, onStopRecording }
       <Animated.View
         style={[styles.ring, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]}
       />
-      <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-        <Pressable
-          style={styles.button}
-          onPress={handlePress}
-          onPressIn={handlePressIn}
-          onLongPress={handleLongPress}
-          onPressOut={handlePressOut}
-          delayLongPress={350}
-        >
+      <Animated.View style={{ transform: [{ scale: buttonScale }] }} {...responder.panHandlers}>
+        <View style={styles.button}>
           <Animated.View
             style={[
               styles.stopSquare,
               { opacity: stopProgress, transform: [{ scale: stopScale }] },
             ]}
           />
-        </Pressable>
+        </View>
       </Animated.View>
     </View>
   );

@@ -25,6 +25,9 @@ const FLASH_CYCLE: FlashMode[] = ['auto', 'on', 'off'];
 
 const ZOOM_SENSITIVITY = 0.4;
 
+// Pixels of vertical drag needed to travel the full zoom range while recording.
+const ZOOM_DRAG_DISTANCE = 220;
+
 function clampZoom(value: number) {
   return Math.min(Math.max(value, 0), 1);
 }
@@ -64,6 +67,10 @@ export function CaptureScreen() {
         }),
     [],
   );
+
+  function handleZoomDrag(dy: number) {
+    applyZoom(zoomBase.current - dy / ZOOM_DRAG_DISTANCE);
+  }
 
   useEffect(() => {
     if (cameraPermission && !cameraPermission.granted && cameraPermission.canAskAgain) {
@@ -105,6 +112,7 @@ export function CaptureScreen() {
     cameraRef.current?.stopRecording();
     setCameraMode('picture');
     setIsRecording(false);
+    zoomBase.current = zoomLive.current;
     Animated.timing(chromeOpacity, {
       toValue: 1,
       duration: 220,
@@ -217,6 +225,7 @@ export function CaptureScreen() {
             onTakePhoto={handleTakePhoto}
             onStartRecording={handleStartRecording}
             onStopRecording={handleStopRecording}
+            onZoomDrag={handleZoomDrag}
           />
 
           <Animated.View
