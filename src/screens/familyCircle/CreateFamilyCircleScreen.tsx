@@ -2,6 +2,7 @@ import type { User } from 'firebase/auth';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
+import { InviteCodeCard } from '../../components/InviteCodeCard';
 import { TextInput } from '../../components/TextInput';
 import { FamilyCircleError, createFamilyCircle } from '../../services/familyCircles';
 import { colors, spacing, typography } from '../../theme';
@@ -59,14 +60,7 @@ export function CreateFamilyCircleScreen({
       <View style={[styles.flex, styles.centred]}>
         <Text style={styles.title}>{name.trim()}</Text>
         <Text style={styles.subtitle}>Share this code with your family so they can join.</Text>
-        <View style={styles.codeCard}>
-          <Text
-            style={styles.code}
-            accessibilityLabel={`Invite code ${created.inviteCode.split('').join(' ')}`}
-          >
-            {created.inviteCode}
-          </Text>
-        </View>
+        <InviteCodeCard code={created.inviteCode} />
         {onContinue ? (
           <View style={styles.continue}>
             <Button label="Continue" onPress={() => onContinue(created.id)} />
@@ -183,20 +177,5 @@ const styles = StyleSheet.create({
   continue: {
     alignSelf: 'stretch',
     marginTop: spacing.sm,
-  },
-  codeCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    marginTop: spacing.xs,
-  },
-  code: {
-    ...typography.display,
-    color: colors.primary,
-    letterSpacing: 4,
-    textAlign: 'center',
   },
 });
