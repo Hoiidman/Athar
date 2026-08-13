@@ -267,6 +267,24 @@ describe('modifying a family circle', () => {
     await assertSucceeds(deleteDoc(doc(db, 'familyCircles', CIRCLE, 'members', JOINER)));
   });
 
+  it('refuses re-appending a member who is already in memberIds', async () => {
+    await seedCircle();
+    await addMember(JOINER);
+    const db = dbFor(JOINER);
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const admin = context.firestore() as unknown as Firestore;
+      await updateDoc(doc(admin, 'familyCircles', CIRCLE), { memberIds: [OWNER, JOINER] });
+    });
+
+    await assertFails(
+      updateDoc(doc(db, 'familyCircles', CIRCLE), {
+        memberIds: [OWNER, JOINER, JOINER],
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
   it('lets a member rename only themselves, and change nothing else', async () => {
     await seedCircle();
     await addMember(JOINER);
