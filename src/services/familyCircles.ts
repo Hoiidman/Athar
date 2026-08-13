@@ -147,15 +147,29 @@ export async function joinFamilyCircle(user: User, rawCode: string): Promise<str
   return circleId;
 }
 
+export interface FamilyCircleSummary {
+  id: string;
+  name: string;
+  inviteCode: string;
+}
+
+export async function getFamilyCircle(circleId: string): Promise<FamilyCircleSummary | null> {
+  const snapshot = await getDoc(doc(firestore, 'familyCircles', circleId));
+  if (!snapshot.exists()) return null;
+
+  const data = snapshot.data();
+  return { id: snapshot.id, name: data.name as string, inviteCode: data.inviteCode as string };
+}
+
 export async function listFamilyCircleMembers(circleId: string): Promise<FamilyCircleMember[]> {
   const snapshot = await getDocs(collection(firestore, 'familyCircles', circleId, 'members'));
 
   return snapshot.docs
     .map((memberDoc) => {
       const data = memberDoc.data() as Omit<FamilyCircleMember, 'joinedAt'> & {
-        joinedAt: Timestamp;
+        joinedAt: Timestamp | null;
       };
-      return { ...data, joinedAt: data.joinedAt.toMillis() };
+      return { ...data, joinedAt: data.joinedAt?.toMillis() ?? Date.now() };
     })
     .sort((a, b) => a.joinedAt - b.joinedAt);
 }

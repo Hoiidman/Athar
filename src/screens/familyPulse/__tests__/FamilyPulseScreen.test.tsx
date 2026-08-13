@@ -44,12 +44,12 @@ describe('FamilyPulseScreen', () => {
     expect(queryByRole('button', { name: 'Skip for now' })).toBeFalsy();
   });
 
-  it('offers the members list when the user already has a circle', async () => {
+  it('offers the circle screen when the user already has a circle', async () => {
     mockGetFamilyCircleId.mockResolvedValue('circle-9');
 
     const { getByRole, queryByRole } = await renderScreen();
 
-    await waitFor(() => expect(getByRole('button', { name: 'View members' })).toBeTruthy());
+    await waitFor(() => expect(getByRole('button', { name: 'Your circle' })).toBeTruthy());
     expect(queryByRole('button', { name: 'Create or join a circle' })).toBeFalsy();
   });
 });

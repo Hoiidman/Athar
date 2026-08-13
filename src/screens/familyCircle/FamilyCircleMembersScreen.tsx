@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
-import { listFamilyCircleMembers } from '../../services/familyCircles';
+import { InviteCodeCard } from '../../components/InviteCodeCard';
+import {
+  getFamilyCircle,
+  listFamilyCircleMembers,
+  type FamilyCircleSummary,
+} from '../../services/familyCircles';
 import { getFamilyCircleId } from '../../services/users';
 import { colors, minTapTarget, spacing, typography } from '../../theme';
 import type { FamilyCircleMember } from '../../types/familyCircle';
@@ -10,7 +15,7 @@ type LoadState =
   | { status: 'loading' }
   | { status: 'error' }
   | { status: 'no-circle' }
-  | { status: 'ready'; members: FamilyCircleMember[] };
+  | { status: 'ready'; circle: FamilyCircleSummary | null; members: FamilyCircleMember[] };
 
 function joinedLabel(joinedAt: number) {
   return `Joined ${new Date(joinedAt).toLocaleDateString()}`;
@@ -58,8 +63,11 @@ export function FamilyCircleMembersScreen({ uid }: { uid: string }) {
           return;
         }
 
-        const members = await listFamilyCircleMembers(circleId);
-        if (!cancelled) setState({ status: 'ready', members });
+        const [circle, members] = await Promise.all([
+          getFamilyCircle(circleId),
+          listFamilyCircleMembers(circleId),
+        ]);
+        if (!cancelled) setState({ status: 'ready', circle, members });
       } catch {
         if (!cancelled) setState({ status: 'error' });
       }
@@ -107,9 +115,20 @@ export function FamilyCircleMembersScreen({ uid }: { uid: string }) {
       keyExtractor={(member) => member.userId}
       renderItem={({ item }) => <MemberRow member={item} />}
       ListHeaderComponent={
-        <Text style={styles.heading}>
-          {state.members.length === 1 ? '1 member' : `${state.members.length} members`}
-        </Text>
+        <View style={styles.header}>
+          {state.circle ? (
+            <>
+              <Text style={styles.circleName}>{state.circle.name}</Text>
+              <Text style={styles.shareHint}>
+                Share this code with your family so they can join.
+              </Text>
+              <InviteCodeCard code={state.circle.inviteCode} />
+            </>
+          ) : null}
+          <Text style={styles.heading}>
+            {state.members.length === 1 ? '1 member' : `${state.members.length} members`}
+          </Text>
+        </View>
       }
     />
   );
@@ -136,10 +155,22 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     gap: spacing.xs,
   },
+  header: {
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  circleName: {
+    ...typography.heading,
+    color: colors.textPrimary,
+  },
+  shareHint: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
   heading: {
     ...typography.caption,
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
+    marginTop: spacing.sm,
   },
   row: {
     flexDirection: 'row',

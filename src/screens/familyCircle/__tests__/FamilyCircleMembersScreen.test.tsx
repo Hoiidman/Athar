@@ -1,14 +1,20 @@
 import { fireEvent, render } from '@testing-library/react-native';
-import { listFamilyCircleMembers } from '../../../services/familyCircles';
+import { getFamilyCircle, listFamilyCircleMembers } from '../../../services/familyCircles';
 import { getFamilyCircleId } from '../../../services/users';
 import type { FamilyCircleMember } from '../../../types/familyCircle';
 import { FamilyCircleMembersScreen } from '../FamilyCircleMembersScreen';
 
-jest.mock('../../../services/familyCircles', () => ({ listFamilyCircleMembers: jest.fn() }));
+jest.mock('../../../services/familyCircles', () => ({
+  getFamilyCircle: jest.fn(),
+  listFamilyCircleMembers: jest.fn(),
+}));
 jest.mock('../../../services/users', () => ({ getFamilyCircleId: jest.fn() }));
 
 const mockGetFamilyCircleId = getFamilyCircleId as jest.Mock;
+const mockGetFamilyCircle = getFamilyCircle as jest.Mock;
 const mockListMembers = listFamilyCircleMembers as jest.Mock;
+
+const circle = { id: 'circle-9', name: 'The Hennawis', inviteCode: 'K7M2P9XR' };
 
 const owner: FamilyCircleMember = {
   userId: 'user-1',
@@ -28,7 +34,9 @@ const joiner: FamilyCircleMember = {
 
 beforeEach(() => {
   mockGetFamilyCircleId.mockReset();
+  mockGetFamilyCircle.mockReset();
   mockListMembers.mockReset();
+  mockGetFamilyCircle.mockResolvedValue(circle);
 });
 
 describe('FamilyCircleMembersScreen', () => {
@@ -41,6 +49,9 @@ describe('FamilyCircleMembersScreen', () => {
     expect(await findByText('Layla')).toBeTruthy();
     expect(getByText('Sami')).toBeTruthy();
     expect(mockListMembers).toHaveBeenCalledWith('circle-9');
+
+    expect(getByText('The Hennawis')).toBeTruthy();
+    expect(getByText('K7M2P9XR')).toBeTruthy();
   });
 
   it('says so when the user has no circle, without asking for members', async () => {

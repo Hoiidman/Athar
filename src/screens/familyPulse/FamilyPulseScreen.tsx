@@ -39,7 +39,7 @@ function CircleAction({ state, onRetry, onViewMembers, onSetUpCircle }: CircleAc
   }
 
   if (state.circleId) {
-    return <Button label="View members" variant="secondary" onPress={onViewMembers} />;
+    return <Button label="Your circle" variant="secondary" onPress={onViewMembers} />;
   }
 
   return <Button label="Create or join a circle" onPress={onSetUpCircle} />;
@@ -63,7 +63,7 @@ export function FamilyPulseScreen({ user }: { user: User }) {
           </PlaceholderScreen>
         )}
       </Stack.Screen>
-      <Stack.Screen name="FamilyCircleMembers" options={{ headerShown: true, title: 'Members' }}>
+      <Stack.Screen name="FamilyCircleMembers" options={{ headerShown: true, title: 'Your circle' }}>
         {() => <FamilyCircleMembersScreen uid={user.uid} />}
       </Stack.Screen>
       <Stack.Screen
