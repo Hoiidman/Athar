@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { CameraView } from 'expo-camera';
 import { useAudioRecorder, RecordingPresets } from 'expo-audio';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +23,12 @@ const FLASH_ICONS: Record<FlashMode, React.ComponentProps<typeof Ionicons>['name
 
 const FLASH_CYCLE: FlashMode[] = ['auto', 'on', 'off'];
 
+const ZOOM_SENSITIVITY = 0.4;
+
+function clampZoom(value: number) {
+  return Math.min(Math.max(value, 0), 1);
+}
+
 export function CaptureScreen() {
   const { granted, cameraPermission, requestAll } = useCaptureMediaPermissions();
   const { destinationId } = useCaptureDestinationStore();
@@ -33,11 +40,30 @@ export function CaptureScreen() {
   const [albumPickerVisible, setAlbumPickerVisible] = useState(false);
   const [lastCaptureUri, setLastCaptureUri] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [zoom, setZoom] = useState(0);
 
   const cameraRef = useRef<CameraView>(null);
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const shutterOpacity = useRef(new Animated.Value(0)).current;
   const chromeOpacity = useRef(new Animated.Value(1)).current;
+  const zoomBase = useRef(0);
+  const zoomLive = useRef(0);
+
+  function applyZoom(next: number) {
+    const clamped = clampZoom(next);
+    zoomLive.current = clamped;
+    setZoom(clamped);
+  }
+
+  const pinchGesture = useMemo(
+    () =>
+      Gesture.Pinch()
+        .onUpdate((e) => applyZoom(zoomBase.current + (e.scale - 1) * ZOOM_SENSITIVITY))
+        .onEnd(() => {
+          zoomBase.current = zoomLive.current;
+        }),
+    [],
+  );
 
   useEffect(() => {
     if (cameraPermission && !cameraPermission.granted && cameraPermission.canAskAgain) {
@@ -125,13 +151,18 @@ export function CaptureScreen() {
           <Text style={styles.voiceHint}>Hold to record</Text>
         </View>
       ) : (
-        <CameraView
-          ref={cameraRef}
-          style={StyleSheet.absoluteFill}
-          facing={facing}
-          flash={flash}
-          mode={cameraMode}
-        />
+        <GestureDetector gesture={pinchGesture}>
+          <View style={StyleSheet.absoluteFill}>
+            <CameraView
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              facing={facing}
+              flash={flash}
+              mode={cameraMode}
+              zoom={zoom}
+            />
+          </View>
+        </GestureDetector>
       )}
 
       <Animated.View
