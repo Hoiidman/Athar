@@ -7,6 +7,7 @@ import {
   getDocs,
   runTransaction,
   serverTimestamp,
+  updateDoc,
   writeBatch,
   type Timestamp,
 } from 'firebase/firestore';
@@ -145,6 +146,14 @@ export async function joinFamilyCircle(user: User, rawCode: string): Promise<str
 
   await batch.commit();
   return circleId;
+}
+
+export async function setMemberDisplayName(
+  circleId: string,
+  uid: string,
+  displayName: string,
+): Promise<void> {
+  await updateDoc(doc(firestore, 'familyCircles', circleId, 'members', uid), { displayName });
 }
 
 export interface FamilyCircleSummary {
