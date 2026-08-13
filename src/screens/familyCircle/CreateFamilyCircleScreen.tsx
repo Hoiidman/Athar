@@ -20,15 +20,12 @@ function messageForError(error: unknown) {
 
 interface CreateFamilyCircleScreenProps {
   user: User;
-  onCreated?: (circleId: string) => void;
-  /** Leaving the screen is a separate step from creating, so the invite code stays on screen until it has been read. */
   onContinue?: (circleId: string) => void;
   onSwitchToJoin?: () => void;
 }
 
 export function CreateFamilyCircleScreen({
   user,
-  onCreated,
   onContinue,
   onSwitchToJoin,
 }: CreateFamilyCircleScreenProps) {
@@ -50,7 +47,6 @@ export function CreateFamilyCircleScreen({
     try {
       const circle = await createFamilyCircle(user, trimmed);
       setCreated({ id: circle.id, inviteCode: circle.inviteCode });
-      onCreated?.(circle.id);
     } catch (error) {
       setFormError(messageForError(error));
     } finally {

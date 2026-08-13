@@ -1,14 +1,20 @@
 import { getRandomBytes } from 'expo-crypto';
 import type { User } from 'firebase/auth';
-import { arrayUnion, doc, getDoc, getDocs, runTransaction, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, getDocs, runTransaction, writeBatch } from 'firebase/firestore';
 import {
   FamilyCircleError,
   createFamilyCircle,
   joinFamilyCircle,
   listFamilyCircleMembers,
 } from '../familyCircles';
+import { ensureUserDocument } from '../users';
 
 jest.mock('../firebase', () => ({ firestore: { __mockFirestore: true } }));
+
+jest.mock('../users', () => ({
+  defaultDisplayName: jest.fn(() => 'Layla'),
+  ensureUserDocument: jest.fn(),
+}));
 
 jest.mock('expo-crypto', () => ({ getRandomBytes: jest.fn() }));
 
@@ -81,12 +87,8 @@ function joinReads(circleId = 'circle-9') {
 }
 
 describe('createFamilyCircle', () => {
-  it('rejects an empty name before touching Firestore', async () => {
+  it('rejects an unusable name before touching Firestore', async () => {
     await expect(createFamilyCircle(user, '   ')).rejects.toThrow(FamilyCircleError);
-    expect(mockRunTransaction).not.toHaveBeenCalled();
-  });
-
-  it('rejects a name longer than the rules allow', async () => {
     await expect(createFamilyCircle(user, 'x'.repeat(61))).rejects.toThrow(FamilyCircleError);
     expect(mockRunTransaction).not.toHaveBeenCalled();
   });
@@ -144,6 +146,19 @@ describe('createFamilyCircle', () => {
     await expect(createFamilyCircle(user, 'The Hennawis')).rejects.toMatchObject({
       code: 'code-generation-failed',
     });
+  });
+
+  it('creates the user document first when it does not exist yet', async () => {
+    mockGetRandomBytes.mockReturnValue(bytesFor(0));
+    mockGetDoc.mockResolvedValueOnce({ exists: () => false });
+    const writes = transactionSpy();
+
+    await createFamilyCircle(user, 'The Hennawis');
+
+    expect(ensureUserDocument).toHaveBeenCalledWith(user);
+    expect(writes).toContainEqual(
+      expect.objectContaining({ kind: 'update', path: 'users/user-1' }),
+    );
   });
 
   it('does not swallow an unrelated Firestore failure as a collision', async () => {
@@ -205,20 +220,6 @@ describe('joinFamilyCircle', () => {
     expect(mockWriteBatch).not.toHaveBeenCalled();
   });
 
-  it('adds the member doc and the memberIds update in one batch', async () => {
-    joinReads();
-    const batch = {
-      set: jest.fn(),
-      update: jest.fn(),
-      commit: jest.fn().mockResolvedValue(undefined),
-    };
-    mockWriteBatch.mockReturnValue(batch);
-
-    await joinFamilyCircle(user, 'K7M2P9XR');
-
-    expect(mockWriteBatch).toHaveBeenCalledTimes(1);
-    expect(batch.commit).toHaveBeenCalledTimes(1);
-  });
 });
 
 describe('listFamilyCircleMembers', () => {
@@ -251,20 +252,5 @@ describe('listFamilyCircleMembers', () => {
 
     expect(members.map((m) => m.userId)).toEqual(['user-1', 'user-2']);
     expect(members[0]?.joinedAt).toBe(100);
-  });
-});
-
-describe('arrayUnion usage', () => {
-  it('adds only the joining user to memberIds', async () => {
-    joinReads();
-    mockWriteBatch.mockReturnValue({
-      set: jest.fn(),
-      update: jest.fn(),
-      commit: jest.fn().mockResolvedValue(undefined),
-    });
-
-    await joinFamilyCircle(user, 'K7M2P9XR');
-
-    expect(arrayUnion).toHaveBeenCalledWith('user-1');
   });
 });

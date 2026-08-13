@@ -17,7 +17,7 @@ import {
 } from '../utils/inviteCode';
 import type { FamilyCircleMember } from '../types/familyCircle';
 import { firestore } from './firebase';
-import { defaultDisplayName } from './users';
+import { defaultDisplayName, ensureUserDocument } from './users';
 
 export type FamilyCircleErrorCode =
   | 'invalid-name'
@@ -40,9 +40,15 @@ export interface CreatedFamilyCircle {
   inviteCode: string;
 }
 
-async function assertNotAlreadyInCircle(user: User) {
+async function requireCirclelessUserDocument(user: User) {
   const snapshot = await getDoc(doc(firestore, 'users', user.uid));
-  if (snapshot.exists() && snapshot.data().familyCircleId) {
+
+  if (!snapshot.exists()) {
+    await ensureUserDocument(user);
+    return;
+  }
+
+  if (snapshot.data().familyCircleId) {
     throw new FamilyCircleError('already-in-circle');
   }
 }
@@ -53,7 +59,7 @@ export async function createFamilyCircle(user: User, name: string): Promise<Crea
     throw new FamilyCircleError('invalid-name');
   }
 
-  await assertNotAlreadyInCircle(user);
+  await requireCirclelessUserDocument(user);
 
   const circleRef = doc(collection(firestore, 'familyCircles'));
   const displayName = defaultDisplayName(user);
@@ -113,7 +119,7 @@ export async function joinFamilyCircle(user: User, rawCode: string): Promise<str
   const code = normalizeInviteCode(rawCode);
   if (!isValidInviteCode(code)) throw new FamilyCircleError('invalid-code');
 
-  await assertNotAlreadyInCircle(user);
+  await requireCirclelessUserDocument(user);
 
   const codeSnapshot = await getDoc(doc(firestore, 'inviteCodes', code));
   if (!codeSnapshot.exists()) throw new FamilyCircleError('code-not-found');

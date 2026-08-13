@@ -15,7 +15,7 @@ export type RootTabParamList = {
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
-export function RootTabNavigator() {
+export function RootTabNavigator({ uid }: { uid: string }) {
   return (
     <Tab.Navigator
       initialRouteName="Capture"
@@ -38,7 +38,9 @@ export function RootTabNavigator() {
       <Tab.Screen name="Capture" component={CaptureScreen} />
       <Tab.Screen name="Timeline" component={TimelineScreen} />
       <Tab.Screen name="MemoryGroups" component={MemoryGroupsScreen} options={{ tabBarLabel: 'Albums' }} />
-      <Tab.Screen name="FamilyPulse" component={FamilyPulseScreen} options={{ tabBarLabel: 'Family' }} />
+      <Tab.Screen name="FamilyPulse" options={{ tabBarLabel: 'Family' }}>
+        {() => <FamilyPulseScreen uid={uid} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 }

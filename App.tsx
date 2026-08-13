@@ -37,7 +37,7 @@ function SignedInRoutes({ user }: { user: User }) {
     );
   }
 
-  if (state.circleId) return <RootTabNavigator />;
+  if (state.circleId) return <RootTabNavigator uid={user.uid} />;
 
   return <FamilyCircleOnboardingScreen user={user} onCircleReady={adoptCircle} />;
 }
