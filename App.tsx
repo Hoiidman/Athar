@@ -22,20 +22,39 @@ function Splash() {
   );
 }
 
+function RetryNotice({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <View style={[styles.splash, styles.centred]}>
+      <Text style={styles.message} accessibilityRole="alert">
+        {message}
+      </Text>
+      <Button label="Try again" variant="secondary" onPress={onRetry} />
+    </View>
+  );
+}
+
 function SignedInRoutes({ user }: { user: User }) {
+  const userDocument = useEnsureUserDocument(user);
   const { state, retry, adoptCircle } = useFamilyCircleMembership(user);
   const onboardingSkip = useCircleOnboardingSkip(user.uid);
+
+  if (userDocument.failed) {
+    return (
+      <RetryNotice
+        message="Could not finish setting up your account. Check your connection and try again."
+        onRetry={userDocument.retry}
+      />
+    );
+  }
 
   if (state.status === 'loading' || onboardingSkip.loading) return <Splash />;
 
   if (state.status === 'error') {
     return (
-      <View style={[styles.splash, styles.centred]}>
-        <Text style={styles.message} accessibilityRole="alert">
-          Could not check your family circle. Check your connection and try again.
-        </Text>
-        <Button label="Try again" variant="secondary" onPress={retry} />
-      </View>
+      <RetryNotice
+        message="Could not check your family circle. Check your connection and try again."
+        onRetry={retry}
+      />
     );
   }
 
@@ -52,7 +71,6 @@ function SignedInRoutes({ user }: { user: User }) {
 
 export default function App() {
   const { user, initializing } = useAuth();
-  useEnsureUserDocument(user);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
