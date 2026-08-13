@@ -1,10 +1,12 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { User } from 'firebase/auth';
+import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
 import { PlaceholderScreen } from '../../components/PlaceholderScreen';
 import { SignOutButton } from '../../components/SignOutButton';
 import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
+import { UpgradeAccountScreen } from '../auth/UpgradeAccountScreen';
 import { FamilyCircleMembersScreen } from '../familyCircle/FamilyCircleMembersScreen';
 import { FamilyCircleOnboardingScreen } from '../familyCircle/FamilyCircleOnboardingScreen';
 import { colors, spacing, typography } from '../../theme';
@@ -13,6 +15,7 @@ export type FamilyPulseStackParamList = {
   FamilyPulseHome: undefined;
   FamilyCircleMembers: undefined;
   FamilyCircleSetup: undefined;
+  UpgradeAccount: undefined;
 };
 
 const Stack = createNativeStackNavigator<FamilyPulseStackParamList>();
@@ -48,6 +51,11 @@ function CircleAction({ state, onRetry, onViewMembers, onSetUpCircle }: CircleAc
 export function FamilyPulseScreen({ user }: { user: User }) {
   const { state, retry, adoptCircle } = useFamilyCircleMembership(user);
 
+  // linkWithCredential keeps the same uid, so onAuthStateChanged does not
+  // reliably fire and `user.isAnonymous` can stay true in React's eyes.
+  const [upgraded, setUpgraded] = useState(false);
+  const isGuest = user.isAnonymous && !upgraded;
+
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="FamilyPulseHome">
@@ -59,12 +67,30 @@ export function FamilyPulseScreen({ user }: { user: User }) {
               onViewMembers={() => navigation.navigate('FamilyCircleMembers')}
               onSetUpCircle={() => navigation.navigate('FamilyCircleSetup')}
             />
+            {isGuest ? (
+              <Button
+                label="Save your account"
+                variant="secondary"
+                onPress={() => navigation.navigate('UpgradeAccount')}
+              />
+            ) : null}
             <SignOutButton />
           </PlaceholderScreen>
         )}
       </Stack.Screen>
       <Stack.Screen name="FamilyCircleMembers" options={{ headerShown: true, title: 'Your circle' }}>
         {() => <FamilyCircleMembersScreen uid={user.uid} />}
+      </Stack.Screen>
+      <Stack.Screen name="UpgradeAccount" options={{ headerShown: true, title: 'Your account' }}>
+        {({ navigation }) => (
+          <UpgradeAccountScreen
+            user={user}
+            onUpgraded={() => {
+              setUpgraded(true);
+              navigation.goBack();
+            }}
+          />
+        )}
       </Stack.Screen>
       <Stack.Screen
         name="FamilyCircleSetup"

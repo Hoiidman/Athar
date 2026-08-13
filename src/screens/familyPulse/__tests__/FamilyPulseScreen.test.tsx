@@ -14,12 +14,12 @@ jest.mock('../../../services/familyCircles', () => ({
 }));
 
 const mockGetFamilyCircleId = getFamilyCircleId as jest.Mock;
-const user = { uid: 'user-1' } as User;
+const user = { uid: 'user-1', isAnonymous: false } as User;
 
-function renderScreen() {
+function renderScreen(as: User = user) {
   return render(
     <NavigationContainer>
-      <FamilyPulseScreen user={user} />
+      <FamilyPulseScreen user={as} />
     </NavigationContainer>,
   );
 }
@@ -44,6 +44,15 @@ describe('FamilyPulseScreen', () => {
     expect(queryByRole('button', { name: 'Skip for now' })).toBeFalsy();
   });
 
+  it('offers a guest a way to save their account', async () => {
+    mockGetFamilyCircleId.mockResolvedValue('circle-9');
+    const guest = { uid: 'guest-1', isAnonymous: true } as User;
+
+    const { getByRole } = await renderScreen(guest);
+
+    await waitFor(() => expect(getByRole('button', { name: 'Save your account' })).toBeTruthy());
+  });
+
   it('offers the circle screen when the user already has a circle', async () => {
     mockGetFamilyCircleId.mockResolvedValue('circle-9');
 
@@ -51,5 +60,6 @@ describe('FamilyPulseScreen', () => {
 
     await waitFor(() => expect(getByRole('button', { name: 'Your circle' })).toBeTruthy());
     expect(queryByRole('button', { name: 'Create or join a circle' })).toBeFalsy();
+    expect(queryByRole('button', { name: 'Save your account' })).toBeFalsy();
   });
 });
