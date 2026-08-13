@@ -21,19 +21,22 @@ function messageForError(error: unknown) {
 interface CreateFamilyCircleScreenProps {
   user: User;
   onCreated?: (circleId: string) => void;
+  /** Leaving the screen is a separate step from creating, so the invite code stays on screen until it has been read. */
+  onContinue?: (circleId: string) => void;
   onSwitchToJoin?: () => void;
 }
 
 export function CreateFamilyCircleScreen({
   user,
   onCreated,
+  onContinue,
   onSwitchToJoin,
 }: CreateFamilyCircleScreenProps) {
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState<string>();
   const [formError, setFormError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
-  const [inviteCode, setInviteCode] = useState<string>();
+  const [created, setCreated] = useState<{ id: string; inviteCode: string }>();
 
   async function handleSubmit() {
     const trimmed = name.trim();
@@ -46,7 +49,7 @@ export function CreateFamilyCircleScreen({
     setSubmitting(true);
     try {
       const circle = await createFamilyCircle(user, trimmed);
-      setInviteCode(circle.inviteCode);
+      setCreated({ id: circle.id, inviteCode: circle.inviteCode });
       onCreated?.(circle.id);
     } catch (error) {
       setFormError(messageForError(error));
@@ -55,16 +58,24 @@ export function CreateFamilyCircleScreen({
     }
   }
 
-  if (inviteCode) {
+  if (created) {
     return (
       <View style={[styles.flex, styles.centred]}>
         <Text style={styles.title}>{name.trim()}</Text>
         <Text style={styles.subtitle}>Share this code with your family so they can join.</Text>
         <View style={styles.codeCard}>
-          <Text style={styles.code} accessibilityLabel={`Invite code ${inviteCode.split('').join(' ')}`}>
-            {inviteCode}
+          <Text
+            style={styles.code}
+            accessibilityLabel={`Invite code ${created.inviteCode.split('').join(' ')}`}
+          >
+            {created.inviteCode}
           </Text>
         </View>
+        {onContinue ? (
+          <View style={styles.continue}>
+            <Button label="Continue" onPress={() => onContinue(created.id)} />
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -172,6 +183,10 @@ const styles = StyleSheet.create({
   action: {
     marginTop: spacing.xs,
     gap: spacing.xs,
+  },
+  continue: {
+    alignSelf: 'stretch',
+    marginTop: spacing.sm,
   },
   codeCard: {
     backgroundColor: colors.surface,
