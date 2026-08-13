@@ -1,5 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { User } from 'firebase/auth';
-import { Text } from 'react-native';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import App from '../App';
 import { useAuth } from '../src/hooks/useAuth';
@@ -32,7 +32,8 @@ jest.mock('../src/services/familyCircles', () => {
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetFamilyCircleId = getFamilyCircleId as jest.Mock;
 
-beforeEach(() => {
+beforeEach(async () => {
+  await AsyncStorage.clear();
   mockUseAuth.mockReset();
   mockGetFamilyCircleId.mockReset();
   mockUseAuth.mockReturnValue({ user: { uid: 'user-1' } as User, initializing: false });
@@ -55,6 +56,21 @@ describe('App routing on family circle membership', () => {
 
     await waitFor(() => expect(getByText('Start a family circle')).toBeTruthy());
     expect(queryByText('Capture screen')).toBeFalsy();
+  });
+
+  it('lets someone skip onboarding into the app, and remembers the choice', async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: 'user-skip' } as User, initializing: false });
+    mockGetFamilyCircleId.mockResolvedValue(null);
+
+    const { getByRole, getByText } = await render(<App />);
+    await waitFor(() => expect(getByText('Start a family circle')).toBeTruthy());
+
+    await fireEvent.press(getByRole('button', { name: 'Skip for now' }));
+
+    await waitFor(() => expect(getByText('Capture screen')).toBeTruthy());
+    await waitFor(async () =>
+      expect(await AsyncStorage.getItem('athar/circle-onboarding-skipped/user-skip')).toBe('true'),
+    );
   });
 
   it('offers a retry instead of onboarding when membership cannot be read', async () => {

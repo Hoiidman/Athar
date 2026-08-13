@@ -9,6 +9,7 @@ import { AuthNavigator } from './src/navigation/AuthNavigator';
 import { Button } from './src/components/Button';
 import { FamilyCircleOnboardingScreen } from './src/screens/familyCircle/FamilyCircleOnboardingScreen';
 import { useAuth } from './src/hooks/useAuth';
+import { useCircleOnboardingSkip } from './src/hooks/useCircleOnboardingSkip';
 import { useEnsureUserDocument } from './src/hooks/useEnsureUserDocument';
 import { useFamilyCircleMembership } from './src/hooks/useFamilyCircleMembership';
 import { colors, spacing, typography } from './src/theme';
@@ -23,8 +24,9 @@ function Splash() {
 
 function SignedInRoutes({ user }: { user: User }) {
   const { state, retry, adoptCircle } = useFamilyCircleMembership(user);
+  const onboardingSkip = useCircleOnboardingSkip(user.uid);
 
-  if (state.status === 'loading') return <Splash />;
+  if (state.status === 'loading' || onboardingSkip.loading) return <Splash />;
 
   if (state.status === 'error') {
     return (
@@ -37,9 +39,15 @@ function SignedInRoutes({ user }: { user: User }) {
     );
   }
 
-  if (state.circleId) return <RootTabNavigator uid={user.uid} />;
+  if (state.circleId || onboardingSkip.skipped) return <RootTabNavigator user={user} />;
 
-  return <FamilyCircleOnboardingScreen user={user} onCircleReady={adoptCircle} />;
+  return (
+    <FamilyCircleOnboardingScreen
+      user={user}
+      onCircleReady={adoptCircle}
+      onSkip={onboardingSkip.skip}
+    />
+  );
 }
 
 export default function App() {

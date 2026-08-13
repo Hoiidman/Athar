@@ -1,5 +1,6 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import type { User } from 'firebase/auth';
 import { CaptureScreen } from '../screens/capture/CaptureScreen';
 import { TimelineScreen } from '../screens/timeline/TimelineScreen';
 import { MemoryGroupsScreen } from '../screens/memoryGroups/MemoryGroupsScreen';
@@ -15,7 +16,7 @@ export type RootTabParamList = {
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
-export function RootTabNavigator({ uid }: { uid: string }) {
+export function RootTabNavigator({ user }: { user: User }) {
   return (
     <Tab.Navigator
       initialRouteName="Capture"
@@ -39,7 +40,7 @@ export function RootTabNavigator({ uid }: { uid: string }) {
       <Tab.Screen name="Timeline" component={TimelineScreen} />
       <Tab.Screen name="MemoryGroups" component={MemoryGroupsScreen} options={{ tabBarLabel: 'Albums' }} />
       <Tab.Screen name="FamilyPulse" options={{ tabBarLabel: 'Family' }}>
-        {() => <FamilyPulseScreen uid={uid} />}
+        {() => <FamilyPulseScreen user={user} />}
       </Tab.Screen>
     </Tab.Navigator>
   );

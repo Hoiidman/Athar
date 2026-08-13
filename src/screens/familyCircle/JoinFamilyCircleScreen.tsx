@@ -25,12 +25,14 @@ interface JoinFamilyCircleScreenProps {
   user: User;
   onJoined?: (circleId: string) => void;
   onSwitchToCreate?: () => void;
+  onSkip?: () => void;
 }
 
 export function JoinFamilyCircleScreen({
   user,
   onJoined,
   onSwitchToCreate,
+  onSkip,
 }: JoinFamilyCircleScreenProps) {
   const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState<string>();
@@ -100,6 +102,14 @@ export function JoinFamilyCircleScreen({
                 label="Start a new circle"
                 variant="secondary"
                 onPress={onSwitchToCreate}
+                disabled={submitting}
+              />
+            ) : null}
+            {onSkip ? (
+              <Button
+                label="Skip for now"
+                variant="secondary"
+                onPress={onSkip}
                 disabled={submitting}
               />
             ) : null}

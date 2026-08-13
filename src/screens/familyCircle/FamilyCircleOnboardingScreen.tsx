@@ -6,11 +6,13 @@ import { JoinFamilyCircleScreen } from './JoinFamilyCircleScreen';
 interface FamilyCircleOnboardingScreenProps {
   user: User;
   onCircleReady: (circleId: string) => void;
+  onSkip?: () => void;
 }
 
 export function FamilyCircleOnboardingScreen({
   user,
   onCircleReady,
+  onSkip,
 }: FamilyCircleOnboardingScreenProps) {
   const [mode, setMode] = useState<'create' | 'join'>('create');
 
@@ -20,6 +22,7 @@ export function FamilyCircleOnboardingScreen({
         user={user}
         onJoined={onCircleReady}
         onSwitchToCreate={() => setMode('create')}
+        onSkip={onSkip}
       />
     );
   }
@@ -29,6 +32,7 @@ export function FamilyCircleOnboardingScreen({
       user={user}
       onContinue={onCircleReady}
       onSwitchToJoin={() => setMode('join')}
+      onSkip={onSkip}
     />
   );
 }
