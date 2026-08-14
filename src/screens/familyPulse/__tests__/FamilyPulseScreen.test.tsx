@@ -1,6 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import type { User } from 'firebase/auth';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { getFamilyCircle, listFamilyCircleMembers } from '../../../services/familyCircles';
 import { getFamilyCircleId } from '../../../services/users';
 import { FamilyPulseScreen } from '../FamilyPulseScreen';
 
@@ -9,12 +10,21 @@ jest.mock('../../../services/users', () => ({ getFamilyCircleId: jest.fn() }));
 jest.mock('../../../services/familyCircles', () => ({
   createFamilyCircle: jest.fn(),
   joinFamilyCircle: jest.fn(),
+  getFamilyCircle: jest.fn(),
   listFamilyCircleMembers: jest.fn(),
   FamilyCircleError: class extends Error {},
 }));
 
 const mockGetFamilyCircleId = getFamilyCircleId as jest.Mock;
+const mockGetFamilyCircle = getFamilyCircle as jest.Mock;
+const mockListMembers = listFamilyCircleMembers as jest.Mock;
 const user = { uid: 'user-1', isAnonymous: false } as User;
+
+const circle = { id: 'circle-9', name: 'The Mohameds', inviteCode: 'K7M2P9XR' };
+const members = [
+  { userId: 'user-1', displayName: 'Ahmed', role: 'owner', inviteCodeUsed: null, joinedAt: 1 },
+  { userId: 'user-2', displayName: 'Sara', role: 'member', inviteCodeUsed: 'K7M2P9XR', joinedAt: 2 },
+];
 
 function renderScreen(as: User = user) {
   return render(
@@ -26,6 +36,8 @@ function renderScreen(as: User = user) {
 
 beforeEach(() => {
   mockGetFamilyCircleId.mockReset();
+  mockGetFamilyCircle.mockReset().mockResolvedValue(circle);
+  mockListMembers.mockReset().mockResolvedValue(members);
 });
 
 describe('FamilyPulseScreen', () => {
@@ -53,13 +65,24 @@ describe('FamilyPulseScreen', () => {
     await waitFor(() => expect(getByRole('button', { name: 'Save your account' })).toBeTruthy());
   });
 
-  it('offers the circle screen when the user already has a circle', async () => {
+  it('names the circle and counts its members when the user has one', async () => {
     mockGetFamilyCircleId.mockResolvedValue('circle-9');
+
+    const { getByRole, getByText, queryByRole } = await renderScreen();
+
+    await waitFor(() => expect(getByRole('button', { name: 'Members, 2 members' })).toBeTruthy());
+    expect(getByText('The Mohameds')).toBeTruthy();
+    expect(queryByRole('button', { name: 'Create or join a circle' })).toBeFalsy();
+    expect(queryByRole('button', { name: 'Save your account' })).toBeFalsy();
+  });
+
+  it('offers a retry rather than the circle when it cannot be read', async () => {
+    mockGetFamilyCircleId.mockResolvedValue('circle-9');
+    mockGetFamilyCircle.mockRejectedValue(new Error('offline'));
 
     const { getByRole, queryByRole } = await renderScreen();
 
-    await waitFor(() => expect(getByRole('button', { name: 'Your circle' })).toBeTruthy());
-    expect(queryByRole('button', { name: 'Create or join a circle' })).toBeFalsy();
-    expect(queryByRole('button', { name: 'Save your account' })).toBeFalsy();
+    await waitFor(() => expect(getByRole('button', { name: 'Try again' })).toBeTruthy());
+    expect(queryByRole('button', { name: 'Members, 2 members' })).toBeFalsy();
   });
 });
