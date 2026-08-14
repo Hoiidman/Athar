@@ -25,7 +25,8 @@ export type FamilyCircleErrorCode =
   | 'invalid-code'
   | 'code-not-found'
   | 'code-generation-failed'
-  | 'already-in-circle';
+  | 'already-in-circle'
+  | 'invalid-relationship';
 
 export class FamilyCircleError extends Error {
   constructor(readonly code: FamilyCircleErrorCode) {
@@ -156,10 +157,28 @@ export async function setMemberDisplayName(
   await updateDoc(doc(firestore, 'familyCircles', circleId, 'members', uid), { displayName });
 }
 
+export const MAX_RELATIONSHIP_LENGTH = 40;
+
+export async function setMemberRelationship(
+  circleId: string,
+  uid: string,
+  relationship: string,
+): Promise<void> {
+  const trimmed = relationship.trim();
+  if (trimmed.length > MAX_RELATIONSHIP_LENGTH) {
+    throw new FamilyCircleError('invalid-relationship');
+  }
+
+  await updateDoc(doc(firestore, 'familyCircles', circleId, 'members', uid), {
+    relationship: trimmed || null,
+  });
+}
+
 export interface FamilyCircleSummary {
   id: string;
   name: string;
   inviteCode: string;
+  ownerId: string;
 }
 
 export async function getFamilyCircle(circleId: string): Promise<FamilyCircleSummary | null> {
@@ -167,7 +186,12 @@ export async function getFamilyCircle(circleId: string): Promise<FamilyCircleSum
   if (!snapshot.exists()) return null;
 
   const data = snapshot.data();
-  return { id: snapshot.id, name: data.name as string, inviteCode: data.inviteCode as string };
+  return {
+    id: snapshot.id,
+    name: data.name as string,
+    inviteCode: data.inviteCode as string,
+    ownerId: data.ownerId as string,
+  };
 }
 
 export async function listFamilyCircleMembers(circleId: string): Promise<FamilyCircleMember[]> {
