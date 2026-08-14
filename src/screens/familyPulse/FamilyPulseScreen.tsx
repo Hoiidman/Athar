@@ -23,6 +23,7 @@ export function FamilyPulseScreen({ user }: { user: User }) {
   // reliably fire and `user.isAnonymous` can stay true in React's eyes.
   const [upgraded, setUpgraded] = useState(false);
   const isGuest = user.isAnonymous && !upgraded;
+  const circleId = state.status === 'ready' ? state.circleId : null;
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -40,7 +41,7 @@ export function FamilyPulseScreen({ user }: { user: User }) {
         )}
       </Stack.Screen>
       <Stack.Screen name="FamilyCircleMembers" options={{ headerShown: true, title: 'Your circle' }}>
-        {() => <FamilyCircleMembersScreen uid={user.uid} />}
+        {() => <FamilyCircleMembersScreen circleId={circleId} />}
       </Stack.Screen>
       <Stack.Screen name="UpgradeAccount" options={{ headerShown: true, title: 'Your account' }}>
         {({ navigation }) => (

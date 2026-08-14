@@ -1,22 +1,10 @@
-import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
 import { InviteCodeCard } from '../../components/InviteCodeCard';
-import {
-  getFamilyCircle,
-  listFamilyCircleMembers,
-  type FamilyCircleSummary,
-} from '../../services/familyCircles';
-import { getFamilyCircleId } from '../../services/users';
+import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
 import { colors, spacing, typography } from '../../theme';
 import type { FamilyCircleMember } from '../../types/familyCircle';
-
-type LoadState =
-  | { status: 'loading' }
-  | { status: 'error' }
-  | { status: 'no-circle' }
-  | { status: 'ready'; circle: FamilyCircleSummary | null; members: FamilyCircleMember[] };
 
 function joinedLabel(joinedAt: number) {
   return `Joined ${new Date(joinedAt).toLocaleDateString()}`;
@@ -44,38 +32,8 @@ function MemberRow({ member }: { member: FamilyCircleMember }) {
   );
 }
 
-export function FamilyCircleMembersScreen({ uid }: { uid: string }) {
-  const [state, setState] = useState<LoadState>({ status: 'loading' });
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    setState({ status: 'loading' });
-
-    void (async () => {
-      try {
-        const circleId = await getFamilyCircleId(uid);
-        if (cancelled) return;
-
-        if (!circleId) {
-          setState({ status: 'no-circle' });
-          return;
-        }
-
-        const [circle, members] = await Promise.all([
-          getFamilyCircle(circleId),
-          listFamilyCircleMembers(circleId),
-        ]);
-        if (!cancelled) setState({ status: 'ready', circle, members });
-      } catch {
-        if (!cancelled) setState({ status: 'error' });
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [uid, attempt]);
+export function FamilyCircleMembersScreen({ circleId }: { circleId: string | null }) {
+  const { state, reload } = useFamilyCircleOverview(circleId);
 
   if (state.status === 'loading') {
     return (
@@ -91,12 +49,12 @@ export function FamilyCircleMembersScreen({ uid }: { uid: string }) {
         <Text style={styles.message} accessibilityRole="alert">
           Could not load your family circle. Check your connection and try again.
         </Text>
-        <Button label="Try again" variant="secondary" onPress={() => setAttempt((n) => n + 1)} />
+        <Button label="Try again" variant="secondary" onPress={reload} />
       </View>
     );
   }
 
-  if (state.status === 'no-circle') {
+  if (state.status === 'missing') {
     return (
       <View style={[styles.screen, styles.centred]}>
         <Text style={styles.message}>
@@ -115,15 +73,9 @@ export function FamilyCircleMembersScreen({ uid }: { uid: string }) {
       renderItem={({ item }) => <MemberRow member={item} />}
       ListHeaderComponent={
         <View style={styles.header}>
-          {state.circle ? (
-            <>
-              <Text style={styles.circleName}>{state.circle.name}</Text>
-              <Text style={styles.shareHint}>
-                Share this code with your family so they can join.
-              </Text>
-              <InviteCodeCard code={state.circle.inviteCode} />
-            </>
-          ) : null}
+          <Text style={styles.circleName}>{state.circle.name}</Text>
+          <Text style={styles.shareHint}>Share this code with your family so they can join.</Text>
+          <InviteCodeCard code={state.circle.inviteCode} />
           <Text style={styles.heading}>
             {state.members.length === 1 ? '1 member' : `${state.members.length} members`}
           </Text>

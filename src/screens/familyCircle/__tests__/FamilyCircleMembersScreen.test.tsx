@@ -1,6 +1,5 @@
 import { fireEvent, render } from '@testing-library/react-native';
 import { getFamilyCircle, listFamilyCircleMembers } from '../../../services/familyCircles';
-import { getFamilyCircleId } from '../../../services/users';
 import type { FamilyCircleMember } from '../../../types/familyCircle';
 import { FamilyCircleMembersScreen } from '../FamilyCircleMembersScreen';
 
@@ -8,9 +7,7 @@ jest.mock('../../../services/familyCircles', () => ({
   getFamilyCircle: jest.fn(),
   listFamilyCircleMembers: jest.fn(),
 }));
-jest.mock('../../../services/users', () => ({ getFamilyCircleId: jest.fn() }));
 
-const mockGetFamilyCircleId = getFamilyCircleId as jest.Mock;
 const mockGetFamilyCircle = getFamilyCircle as jest.Mock;
 const mockListMembers = listFamilyCircleMembers as jest.Mock;
 
@@ -33,7 +30,6 @@ const joiner: FamilyCircleMember = {
 };
 
 beforeEach(() => {
-  mockGetFamilyCircleId.mockReset();
   mockGetFamilyCircle.mockReset();
   mockListMembers.mockReset();
   mockGetFamilyCircle.mockResolvedValue(circle);
@@ -41,10 +37,11 @@ beforeEach(() => {
 
 describe('FamilyCircleMembersScreen', () => {
   it('lists the members of the circle the user belongs to', async () => {
-    mockGetFamilyCircleId.mockResolvedValue('circle-9');
     mockListMembers.mockResolvedValue([owner, joiner]);
 
-    const { findByText, getByText } = await render(<FamilyCircleMembersScreen uid="user-1" />);
+    const { findByText, getByText } = await render(
+      <FamilyCircleMembersScreen circleId="circle-9" />,
+    );
 
     expect(await findByText('Layla')).toBeTruthy();
     expect(getByText('Sami')).toBeTruthy();
@@ -55,19 +52,19 @@ describe('FamilyCircleMembersScreen', () => {
   });
 
   it('says so when the user has no circle, without asking for members', async () => {
-    mockGetFamilyCircleId.mockResolvedValue(null);
-
-    const { findByText } = await render(<FamilyCircleMembersScreen uid="user-1" />);
+    const { findByText } = await render(<FamilyCircleMembersScreen circleId={null} />);
 
     expect(await findByText(/not in a family circle yet/)).toBeTruthy();
     expect(mockListMembers).not.toHaveBeenCalled();
   });
 
   it('retries the read after a failure', async () => {
-    mockGetFamilyCircleId.mockRejectedValueOnce(new Error('offline')).mockResolvedValue('circle-9');
+    mockGetFamilyCircle.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(circle);
     mockListMembers.mockResolvedValue([owner]);
 
-    const { findByText, getByRole } = await render(<FamilyCircleMembersScreen uid="user-1" />);
+    const { findByText, getByRole } = await render(
+      <FamilyCircleMembersScreen circleId="circle-9" />,
+    );
 
     expect(await findByText(/Could not load your family circle/)).toBeTruthy();
 
