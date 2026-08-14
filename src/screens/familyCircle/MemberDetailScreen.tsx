@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
+import { TextInput } from '../../components/TextInput';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
+import { MAX_RELATIONSHIP_LENGTH, setMemberRelationship } from '../../services/familyCircles';
 import { colors, spacing, typography } from '../../theme';
 
 interface MemberDetailScreenProps {
@@ -16,6 +19,82 @@ function Detail({ label, value }: { label: string; value: string }) {
     <View style={styles.detail}>
       <Text style={styles.detailLabel}>{label}</Text>
       <Text style={styles.detailValue}>{value}</Text>
+    </View>
+  );
+}
+
+interface RelationshipFieldProps {
+  circleId: string;
+  userId: string;
+  current: string | null;
+  canEdit: boolean;
+  onSaved: () => void;
+}
+
+function RelationshipField({
+  circleId,
+  userId,
+  current,
+  canEdit,
+  onSaved,
+}: RelationshipFieldProps) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(current ?? '');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string>();
+
+  if (!editing) {
+    return (
+      <View style={styles.detail}>
+        <Text style={styles.detailLabel}>Relationship</Text>
+        <View style={styles.detailAction}>
+          <Text style={styles.detailValue}>{current || 'Not set'}</Text>
+          {canEdit ? (
+            <Button
+              label={current ? 'Change' : 'Add'}
+              variant="secondary"
+              onPress={() => {
+                setValue(current ?? '');
+                setError(undefined);
+                setEditing(true);
+              }}
+              accessibilityLabel={current ? 'Change relationship' : 'Add relationship'}
+            />
+          ) : null}
+        </View>
+      </View>
+    );
+  }
+
+  async function save() {
+    setError(undefined);
+    setPending(true);
+    try {
+      await setMemberRelationship(circleId, userId, value);
+      setEditing(false);
+      onSaved();
+    } catch {
+      setError('Could not save. Check your connection and try again.');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <View style={styles.editor}>
+      <TextInput
+        label="Relationship"
+        value={value}
+        onChangeText={setValue}
+        error={error}
+        helperText="How this person is related — Dad, Grandma, Sister."
+        maxLength={MAX_RELATIONSHIP_LENGTH}
+        autoCapitalize="words"
+      />
+      <View style={styles.editorActions}>
+        <Button label="Cancel" variant="secondary" onPress={() => setEditing(false)} />
+        <Button label="Save" onPress={save} loading={pending} />
+      </View>
     </View>
   );
 }
@@ -46,9 +125,10 @@ export function MemberDetailScreen({ circleId, userId, currentUid }: MemberDetai
     );
   }
 
-  const member = state.status === 'ready' ? state.members.find((m) => m.userId === userId) : null;
+  const member =
+    state.status === 'ready' ? state.members.find((m) => m.userId === userId) : undefined;
 
-  if (!member) {
+  if (state.status !== 'ready' || !member) {
     return (
       <View style={[styles.screen, styles.centred]}>
         <EmptyState
@@ -69,6 +149,13 @@ export function MemberDetailScreen({ circleId, userId, currentUid }: MemberDetai
       </View>
 
       <View style={styles.card}>
+        <RelationshipField
+          circleId={state.circle.id}
+          userId={userId}
+          current={member.relationship ?? null}
+          canEdit={userId === currentUid || state.circle.ownerId === currentUid}
+          onSaved={reload}
+        />
         <Detail label="Role" value={member.role === 'owner' ? 'Family owner' : 'Member'} />
         <Detail label="Joined" value={new Date(member.joinedAt).toLocaleDateString()} />
       </View>
@@ -117,6 +204,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     paddingVertical: spacing.sm,
+  },
+  detailAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexShrink: 1,
+  },
+  editor: {
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+  },
+  editorActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.xs,
   },
   detailLabel: {
     ...typography.body,

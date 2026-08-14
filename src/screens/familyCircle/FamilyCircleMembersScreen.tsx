@@ -14,12 +14,15 @@ function joinedLabel(joinedAt: number) {
 function MemberRow({ member, onPress }: { member: FamilyCircleMember; onPress: () => void }) {
   const joined = joinedLabel(member.joinedAt);
   const role = member.role === 'owner' ? 'Owner' : undefined;
+  const meta = [member.relationship, joined].filter(Boolean).join(' · ');
 
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={[member.displayName, role, joined].filter(Boolean).join(', ')}
+      accessibilityLabel={[member.displayName, role, member.relationship, joined]
+        .filter(Boolean)
+        .join(', ')}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
       <Avatar name={member.displayName} />
@@ -28,7 +31,7 @@ function MemberRow({ member, onPress }: { member: FamilyCircleMember; onPress: (
           <Text style={styles.name}>{member.displayName}</Text>
           {role ? <Text style={styles.badge}>{role}</Text> : null}
         </View>
-        <Text style={styles.meta}>{joined}</Text>
+        <Text style={styles.meta}>{meta}</Text>
       </View>
       <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
     </Pressable>

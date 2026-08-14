@@ -1,15 +1,22 @@
-import { render } from '@testing-library/react-native';
-import { getFamilyCircle, listFamilyCircleMembers } from '../../../services/familyCircles';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import {
+  getFamilyCircle,
+  listFamilyCircleMembers,
+  setMemberRelationship,
+} from '../../../services/familyCircles';
 import type { FamilyCircleMember } from '../../../types/familyCircle';
 import { MemberDetailScreen } from '../MemberDetailScreen';
 
 jest.mock('../../../services/familyCircles', () => ({
   getFamilyCircle: jest.fn(),
   listFamilyCircleMembers: jest.fn(),
+  setMemberRelationship: jest.fn(),
+  MAX_RELATIONSHIP_LENGTH: 40,
 }));
 
 const mockGetFamilyCircle = getFamilyCircle as jest.Mock;
 const mockListMembers = listFamilyCircleMembers as jest.Mock;
+const mockSetRelationship = setMemberRelationship as jest.Mock;
 
 const owner: FamilyCircleMember = {
   userId: 'user-1',
@@ -19,13 +26,23 @@ const owner: FamilyCircleMember = {
   joinedAt: 1_000,
 };
 
+const joiner: FamilyCircleMember = {
+  userId: 'user-2',
+  displayName: 'Sami',
+  role: 'member',
+  inviteCodeUsed: 'K7M2P9XR',
+  joinedAt: 2_000,
+};
+
 beforeEach(() => {
   mockGetFamilyCircle.mockReset().mockResolvedValue({
     id: 'circle-9',
     name: 'The Hennawis',
     inviteCode: 'K7M2P9XR',
+    ownerId: 'user-1',
   });
-  mockListMembers.mockReset().mockResolvedValue([owner]);
+  mockListMembers.mockReset().mockResolvedValue([owner, joiner]);
+  mockSetRelationship.mockReset().mockResolvedValue(undefined);
 });
 
 describe('MemberDetailScreen', () => {
@@ -46,5 +63,28 @@ describe('MemberDetailScreen', () => {
 
     expect(await findByText('No longer a member')).toBeTruthy();
     expect(queryByText('This is you')).toBeFalsy();
+  });
+
+  it('lets the family owner label another member', async () => {
+    const { findByRole, getByLabelText, getByRole } = await render(
+      <MemberDetailScreen circleId="circle-9" userId="user-2" currentUid="user-1" />,
+    );
+
+    await fireEvent.press(await findByRole('button', { name: 'Add relationship' }));
+    await fireEvent.changeText(getByLabelText('Relationship'), 'Brother');
+    await fireEvent.press(getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mockSetRelationship).toHaveBeenCalledWith('circle-9', 'user-2', 'Brother'),
+    );
+  });
+
+  it('does not offer an ordinary member the label of someone else', async () => {
+    const { findByText, queryByRole } = await render(
+      <MemberDetailScreen circleId="circle-9" userId="user-1" currentUid="user-2" />,
+    );
+
+    expect(await findByText('Layla')).toBeTruthy();
+    expect(queryByRole('button', { name: 'Add relationship' })).toBeFalsy();
   });
 });
