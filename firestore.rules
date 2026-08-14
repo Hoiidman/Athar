@@ -65,13 +65,23 @@ service cloud.firestore {
       return ['userId', 'displayName', 'role', 'inviteCodeUsed', 'joinedAt'];
     }
 
+    // Optional so member documents written before this field existed still
+    // validate when they are updated — an update is checked against the
+    // merged document, which would otherwise be missing the key.
+    function memberOptionalFields() {
+      return ['relationship'];
+    }
+
     function isValidMember(data) {
-      return data.keys().hasOnly(memberFields())
-        && data.keys().hasAll(memberFields())
+      return data.keys().hasAll(memberFields())
+        && data.keys().hasOnly(memberFields().concat(memberOptionalFields()))
         && data.userId is string
         && data.displayName is string
         && data.displayName.size() > 0
-        && data.displayName.size() <= 80;
+        && data.displayName.size() <= 80
+        && (!data.keys().hasAny(['relationship'])
+          || data.relationship == null
+          || (data.relationship is string && data.relationship.size() <= 40));
     }
 
     match /familyCircles/{circleId} {
@@ -121,6 +131,16 @@ service cloud.firestore {
 
       match /members/{userId} {
 
+        function isCircleOwner() {
+          return isSignedIn()
+            && get(/databases/$(database)/documents/familyCircles/$(circleId)).data.ownerId
+              == request.auth.uid;
+        }
+
+        function changesOnly(fields) {
+          return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+        }
+
         function isFoundingOwner() {
           return request.resource.data.role == 'owner'
             && request.resource.data.inviteCodeUsed == null
@@ -143,9 +163,11 @@ service cloud.firestore {
           && request.resource.data.joinedAt == request.time
           && (isFoundingOwner() || knowsInviteCode());
 
-        allow update: if isOwner(userId)
-          && isValidMember(request.resource.data)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName']);
+        allow update: if isValidMember(request.resource.data)
+          && (
+            (isOwner(userId) && changesOnly(['displayName', 'relationship']))
+            || (isCircleOwner() && changesOnly(['relationship']))
+          );
 
         allow delete: if isOwner(userId);
       }

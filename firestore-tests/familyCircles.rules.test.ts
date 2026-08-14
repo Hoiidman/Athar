@@ -300,6 +300,44 @@ describe('modifying a family circle', () => {
       updateDoc(doc(db, 'familyCircles', CIRCLE, 'members', OWNER), { displayName: 'Hijacked' }),
     );
   });
+
+  it('lets a member describe their own relationship', async () => {
+    await seedCircle();
+    await addMember(JOINER);
+    const db = dbFor(JOINER);
+    const own = doc(db, 'familyCircles', CIRCLE, 'members', JOINER);
+
+    await assertSucceeds(updateDoc(own, { relationship: 'Brother' }));
+    await assertSucceeds(updateDoc(own, { displayName: 'Sami', relationship: null }));
+
+    await assertFails(updateDoc(own, { relationship: 'x'.repeat(41) }));
+    await assertFails(updateDoc(own, { relationship: 7 }));
+  });
+
+  it('lets the family owner label anyone, without renaming them', async () => {
+    await seedCircle();
+    await addMember(JOINER);
+    const theirs = doc(dbFor(OWNER), 'familyCircles', CIRCLE, 'members', JOINER);
+
+    await assertSucceeds(updateDoc(theirs, { relationship: 'Brother' }));
+
+    await assertFails(updateDoc(theirs, { displayName: 'Renamed' }));
+    await assertFails(updateDoc(theirs, { relationship: 'Brother', displayName: 'Renamed' }));
+  });
+
+  it('does not let an ordinary member label anyone else', async () => {
+    await seedCircle();
+    await addMember(JOINER);
+    await addMember(STRANGER);
+    const db = dbFor(JOINER);
+
+    await assertFails(
+      updateDoc(doc(db, 'familyCircles', CIRCLE, 'members', OWNER), { relationship: 'Dad' }),
+    );
+    await assertFails(
+      updateDoc(doc(db, 'familyCircles', CIRCLE, 'members', STRANGER), { relationship: 'Cousin' }),
+    );
+  });
 });
 
 describe('invite codes', () => {
