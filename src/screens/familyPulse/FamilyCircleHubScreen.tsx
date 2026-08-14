@@ -19,6 +19,7 @@ interface FamilyCircleHubScreenProps {
   state: MembershipState;
   onRetryMembership: () => void;
   onOpenMembers: () => void;
+  onOpenInvite: () => void;
   onSetUpCircle: () => void;
   onUpgradeAccount: () => void;
 }
@@ -48,10 +49,11 @@ function CircleSection({
   state,
   onRetryMembership,
   onOpenMembers,
+  onOpenInvite,
   onSetUpCircle,
 }: Pick<
   FamilyCircleHubScreenProps,
-  'state' | 'onRetryMembership' | 'onOpenMembers' | 'onSetUpCircle'
+  'state' | 'onRetryMembership' | 'onOpenMembers' | 'onOpenInvite' | 'onSetUpCircle'
 >) {
   const circleId = state.status === 'ready' ? state.circleId : null;
   const { state: overview, reload } = useFamilyCircleOverview(circleId);
@@ -114,6 +116,12 @@ function CircleSection({
         meta={memberCountLabel(overview.members.length)}
         onPress={onOpenMembers}
       />
+      <ActionRow
+        icon="mail-open"
+        title="Invite"
+        subtitle="Share your code with family"
+        onPress={onOpenInvite}
+      />
     </>
   );
 }
@@ -123,6 +131,7 @@ export function FamilyCircleHubScreen({
   state,
   onRetryMembership,
   onOpenMembers,
+  onOpenInvite,
   onSetUpCircle,
   onUpgradeAccount,
 }: FamilyCircleHubScreenProps) {
@@ -139,6 +148,7 @@ export function FamilyCircleHubScreen({
             state={state}
             onRetryMembership={onRetryMembership}
             onOpenMembers={onOpenMembers}
+            onOpenInvite={onOpenInvite}
             onSetUpCircle={onSetUpCircle}
           />
         </Section>
