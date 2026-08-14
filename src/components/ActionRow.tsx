@@ -6,15 +6,17 @@ interface ActionRowProps {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   subtitle?: string;
+  /** Short count or status shown before the chevron, e.g. "7 people". */
+  meta?: string;
   onPress: () => void;
 }
 
-export function ActionRow({ icon, title, subtitle, onPress }: ActionRowProps) {
+export function ActionRow({ icon, title, subtitle, meta, onPress }: ActionRowProps) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={meta ? `${title}, ${meta}` : title}
       accessibilityHint={subtitle}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
@@ -25,6 +27,7 @@ export function ActionRow({ icon, title, subtitle, onPress }: ActionRowProps) {
         <Text style={styles.title}>{title}</Text>
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
+      {meta ? <Text style={styles.meta}>{meta}</Text> : null}
       <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
     </Pressable>
   );
@@ -63,6 +66,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   subtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  meta: {
     ...typography.caption,
     color: colors.textSecondary,
   },
