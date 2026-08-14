@@ -1,4 +1,5 @@
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
 import { InviteCodeCard } from '../../components/InviteCodeCard';
@@ -10,15 +11,16 @@ function joinedLabel(joinedAt: number) {
   return `Joined ${new Date(joinedAt).toLocaleDateString()}`;
 }
 
-function MemberRow({ member }: { member: FamilyCircleMember }) {
+function MemberRow({ member, onPress }: { member: FamilyCircleMember; onPress: () => void }) {
   const joined = joinedLabel(member.joinedAt);
   const role = member.role === 'owner' ? 'Owner' : undefined;
 
   return (
-    <View
-      style={styles.row}
-      accessible
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
       accessibilityLabel={[member.displayName, role, joined].filter(Boolean).join(', ')}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
       <Avatar name={member.displayName} />
       <View style={styles.details}>
@@ -28,11 +30,20 @@ function MemberRow({ member }: { member: FamilyCircleMember }) {
         </View>
         <Text style={styles.meta}>{joined}</Text>
       </View>
-    </View>
+      <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+    </Pressable>
   );
 }
 
-export function FamilyCircleMembersScreen({ circleId }: { circleId: string | null }) {
+interface FamilyCircleMembersScreenProps {
+  circleId: string | null;
+  onOpenMember: (userId: string) => void;
+}
+
+export function FamilyCircleMembersScreen({
+  circleId,
+  onOpenMember,
+}: FamilyCircleMembersScreenProps) {
   const { state, reload } = useFamilyCircleOverview(circleId);
 
   if (state.status === 'loading') {
@@ -70,7 +81,9 @@ export function FamilyCircleMembersScreen({ circleId }: { circleId: string | nul
       contentContainerStyle={styles.list}
       data={state.members}
       keyExtractor={(member) => member.userId}
-      renderItem={({ item }) => <MemberRow member={item} />}
+      renderItem={({ item }) => (
+        <MemberRow member={item} onPress={() => onOpenMember(item.userId)} />
+      )}
       ListHeaderComponent={
         <View style={styles.header}>
           <Text style={styles.circleName}>{state.circle.name}</Text>
@@ -133,6 +146,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
+  },
+  pressed: {
+    opacity: 0.7,
   },
   details: {
     flex: 1,

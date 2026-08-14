@@ -29,9 +29,12 @@ const joiner: FamilyCircleMember = {
   joinedAt: 2_000,
 };
 
+const onOpenMember = jest.fn();
+
 beforeEach(() => {
   mockGetFamilyCircle.mockReset();
   mockListMembers.mockReset();
+  onOpenMember.mockReset();
   mockGetFamilyCircle.mockResolvedValue(circle);
 });
 
@@ -40,7 +43,7 @@ describe('FamilyCircleMembersScreen', () => {
     mockListMembers.mockResolvedValue([owner, joiner]);
 
     const { findByText, getByText } = await render(
-      <FamilyCircleMembersScreen circleId="circle-9" />,
+      <FamilyCircleMembersScreen circleId="circle-9" onOpenMember={onOpenMember} />,
     );
 
     expect(await findByText('Layla')).toBeTruthy();
@@ -52,10 +55,24 @@ describe('FamilyCircleMembersScreen', () => {
   });
 
   it('says so when the user has no circle, without asking for members', async () => {
-    const { findByText } = await render(<FamilyCircleMembersScreen circleId={null} />);
+    const { findByText } = await render(
+      <FamilyCircleMembersScreen circleId={null} onOpenMember={onOpenMember} />,
+    );
 
     expect(await findByText(/not in a family circle yet/)).toBeTruthy();
     expect(mockListMembers).not.toHaveBeenCalled();
+  });
+
+  it('opens the member behind the row that was tapped', async () => {
+    mockListMembers.mockResolvedValue([owner, joiner]);
+
+    const { findByRole } = await render(
+      <FamilyCircleMembersScreen circleId="circle-9" onOpenMember={onOpenMember} />,
+    );
+
+    await fireEvent.press(await findByRole('button', { name: /^Sami/ }));
+
+    expect(onOpenMember).toHaveBeenCalledWith('user-2');
   });
 
   it('retries the read after a failure', async () => {
@@ -63,7 +80,7 @@ describe('FamilyCircleMembersScreen', () => {
     mockListMembers.mockResolvedValue([owner]);
 
     const { findByText, getByRole } = await render(
-      <FamilyCircleMembersScreen circleId="circle-9" />,
+      <FamilyCircleMembersScreen circleId="circle-9" onOpenMember={onOpenMember} />,
     );
 
     expect(await findByText(/Could not load your family circle/)).toBeTruthy();

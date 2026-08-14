@@ -5,11 +5,13 @@ import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership
 import { UpgradeAccountScreen } from '../auth/UpgradeAccountScreen';
 import { FamilyCircleMembersScreen } from '../familyCircle/FamilyCircleMembersScreen';
 import { FamilyCircleOnboardingScreen } from '../familyCircle/FamilyCircleOnboardingScreen';
+import { MemberDetailScreen } from '../familyCircle/MemberDetailScreen';
 import { FamilyCircleHubScreen } from './FamilyCircleHubScreen';
 
 export type FamilyPulseStackParamList = {
   FamilyPulseHome: undefined;
   FamilyCircleMembers: undefined;
+  FamilyCircleMember: { userId: string };
   FamilyCircleSetup: undefined;
   UpgradeAccount: undefined;
 };
@@ -41,7 +43,21 @@ export function FamilyPulseScreen({ user }: { user: User }) {
         )}
       </Stack.Screen>
       <Stack.Screen name="FamilyCircleMembers" options={{ headerShown: true, title: 'Your circle' }}>
-        {() => <FamilyCircleMembersScreen circleId={circleId} />}
+        {({ navigation }) => (
+          <FamilyCircleMembersScreen
+            circleId={circleId}
+            onOpenMember={(userId) => navigation.navigate('FamilyCircleMember', { userId })}
+          />
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="FamilyCircleMember" options={{ headerShown: true, title: 'Member' }}>
+        {({ route }) => (
+          <MemberDetailScreen
+            circleId={circleId}
+            userId={route.params.userId}
+            currentUid={user.uid}
+          />
+        )}
       </Stack.Screen>
       <Stack.Screen name="UpgradeAccount" options={{ headerShown: true, title: 'Your account' }}>
         {({ navigation }) => (
