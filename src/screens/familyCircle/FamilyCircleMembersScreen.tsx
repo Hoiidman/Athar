@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
 import { InviteCodeCard } from '../../components/InviteCodeCard';
 import {
@@ -8,7 +9,7 @@ import {
   type FamilyCircleSummary,
 } from '../../services/familyCircles';
 import { getFamilyCircleId } from '../../services/users';
-import { colors, minTapTarget, spacing, typography } from '../../theme';
+import { colors, spacing, typography } from '../../theme';
 import type { FamilyCircleMember } from '../../types/familyCircle';
 
 type LoadState =
@@ -31,9 +32,7 @@ function MemberRow({ member }: { member: FamilyCircleMember }) {
       accessible
       accessibilityLabel={[member.displayName, role, joined].filter(Boolean).join(', ')}
     >
-      <View style={styles.avatar}>
-        <Text style={styles.initial}>{member.displayName.charAt(0).toUpperCase()}</Text>
-      </View>
+      <Avatar name={member.displayName} />
       <View style={styles.details}>
         <View style={styles.nameRow}>
           <Text style={styles.name}>{member.displayName}</Text>
@@ -182,18 +181,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-  },
-  avatar: {
-    width: minTapTarget,
-    height: minTapTarget,
-    borderRadius: minTapTarget / 2,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initial: {
-    ...typography.heading,
-    color: colors.textOnAccent,
   },
   details: {
     flex: 1,
