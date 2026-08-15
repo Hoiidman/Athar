@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
-import { InviteCodeCard } from '../../components/InviteCodeCard';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
 import { colors, spacing, typography } from '../../theme';
 import type { FamilyCircleMember } from '../../types/familyCircle';
@@ -41,11 +40,13 @@ function MemberRow({ member, onPress }: { member: FamilyCircleMember; onPress: (
 interface FamilyCircleMembersScreenProps {
   circleId: string | null;
   onOpenMember: (userId: string) => void;
+  onInvite: () => void;
 }
 
 export function FamilyCircleMembersScreen({
   circleId,
   onOpenMember,
+  onInvite,
 }: FamilyCircleMembersScreenProps) {
   const { state, reload } = useFamilyCircleOverview(circleId);
 
@@ -88,13 +89,13 @@ export function FamilyCircleMembersScreen({
         <MemberRow member={item} onPress={() => onOpenMember(item.userId)} />
       )}
       ListHeaderComponent={
-        <View style={styles.header}>
-          <Text style={styles.circleName}>{state.circle.name}</Text>
-          <Text style={styles.shareHint}>Share this code with your family so they can join.</Text>
-          <InviteCodeCard code={state.circle.inviteCode} />
-          <Text style={styles.heading}>
-            {state.members.length === 1 ? '1 member' : `${state.members.length} members`}
-          </Text>
+        <Text style={styles.heading}>
+          {state.members.length === 1 ? '1 member' : `${state.members.length} members`}
+        </Text>
+      }
+      ListFooterComponent={
+        <View style={styles.footer}>
+          <Button label="Invite family member" variant="secondary" onPress={onInvite} />
         </View>
       }
     />
@@ -122,21 +123,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     gap: spacing.xs,
   },
-  header: {
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  circleName: {
-    ...typography.heading,
-    color: colors.textPrimary,
-  },
-  shareHint: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
   heading: {
     ...typography.caption,
     color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  footer: {
     marginTop: spacing.sm,
   },
   row: {

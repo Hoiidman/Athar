@@ -50,6 +50,7 @@ export function FamilyPulseScreen({ user }: { user: User }) {
           <FamilyCircleMembersScreen
             circleId={circleId}
             onOpenMember={(userId) => navigation.navigate('FamilyCircleMember', { userId })}
+            onInvite={() => navigation.navigate('FamilyCircleInvite')}
           />
         )}
       </Stack.Screen>
