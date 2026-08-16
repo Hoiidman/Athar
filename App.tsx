@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { RootTabNavigator } from './src/navigation/RootTabNavigator';
+import { RootStackNavigator } from './src/navigation/RootStackNavigator';
 import { AuthNavigator } from './src/navigation/AuthNavigator';
 import { useAuth } from './src/hooks/useAuth';
 import { useEnsureUserDocument } from './src/hooks/useEnsureUserDocument';
@@ -22,7 +22,7 @@ export default function App() {
               <ActivityIndicator size="large" color={colors.primary} />
             </View>
           ) : user ? (
-            <RootTabNavigator />
+            <RootStackNavigator />
           ) : (
             <AuthNavigator />
           )}
