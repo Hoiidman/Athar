@@ -30,7 +30,15 @@
           "microphonePermission": "Athar uses your microphone to record voice notes and video sound."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-video",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Athar saves the memories you edit to your photo library.",
+          "savePhotosPermission": "Athar saves the memories you edit to your photo library."
+        }
+      ]
     ]
   }
 }
