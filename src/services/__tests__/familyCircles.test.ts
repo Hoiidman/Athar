@@ -1,11 +1,13 @@
 import { getRandomBytes } from 'expo-crypto';
 import type { User } from 'firebase/auth';
-import { doc, getDoc, getDocs, runTransaction, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, getDocs, runTransaction, updateDoc, writeBatch } from 'firebase/firestore';
 import {
   FamilyCircleError,
   createFamilyCircle,
   joinFamilyCircle,
+  leaveFamilyCircle,
   listFamilyCircleMembers,
+  renameFamilyCircle,
   rotateInviteCode,
 } from '../familyCircles';
 import { ensureUserDocument } from '../users';
@@ -20,6 +22,7 @@ jest.mock('../users', () => ({
 jest.mock('expo-crypto', () => ({ getRandomBytes: jest.fn() }));
 
 jest.mock('firebase/firestore', () => ({
+  arrayRemove: jest.fn((value: string) => ({ __arrayRemove: value })),
   arrayUnion: jest.fn((value: string) => ({ __arrayUnion: value })),
   collection: jest.fn((_db: unknown, path: string) => ({ __collection: path })),
   doc: jest.fn(),
@@ -27,6 +30,7 @@ jest.mock('firebase/firestore', () => ({
   getDocs: jest.fn(),
   runTransaction: jest.fn(),
   serverTimestamp: jest.fn(() => '__ts'),
+  updateDoc: jest.fn(),
   writeBatch: jest.fn(),
 }));
 
@@ -233,6 +237,49 @@ describe('joinFamilyCircle', () => {
     expect(mockWriteBatch).not.toHaveBeenCalled();
   });
 
+});
+
+describe('leaveFamilyCircle', () => {
+  it('drops the member document, the list entry and the pointer together', async () => {
+    const batch = {
+      delete: jest.fn(),
+      update: jest.fn(),
+      commit: jest.fn().mockResolvedValue(undefined),
+    };
+    mockWriteBatch.mockReturnValue(batch);
+
+    await leaveFamilyCircle(user, 'circle-9');
+
+    expect(batch.delete).toHaveBeenCalledWith(
+      expect.objectContaining({ __path: 'familyCircles/circle-9/members/user-1' }),
+    );
+    expect(batch.update).toHaveBeenCalledWith(
+      expect.objectContaining({ __path: 'familyCircles/circle-9' }),
+      expect.objectContaining({ memberIds: { __arrayRemove: 'user-1' } }),
+    );
+    expect(batch.update).toHaveBeenCalledWith(
+      expect.objectContaining({ __path: 'users/user-1' }),
+      expect.objectContaining({ familyCircleId: null }),
+    );
+    expect(batch.commit).toHaveBeenCalled();
+  });
+});
+
+describe('renameFamilyCircle', () => {
+  it('rejects an unusable name before writing', async () => {
+    await expect(renameFamilyCircle('circle-9', '   ')).rejects.toThrow(FamilyCircleError);
+    await expect(renameFamilyCircle('circle-9', 'x'.repeat(61))).rejects.toThrow(FamilyCircleError);
+    expect(updateDoc).not.toHaveBeenCalled();
+  });
+
+  it('trims the name it writes', async () => {
+    await renameFamilyCircle('circle-9', '  The Hennawi Family  ');
+
+    expect(updateDoc).toHaveBeenCalledWith(
+      expect.objectContaining({ __path: 'familyCircles/circle-9' }),
+      expect.objectContaining({ name: 'The Hennawi Family' }),
+    );
+  });
 });
 
 describe('rotateInviteCode', () => {

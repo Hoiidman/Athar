@@ -1,5 +1,6 @@
 import type { User } from 'firebase/auth';
 import {
+  arrayRemove,
   arrayUnion,
   collection,
   doc,
@@ -56,9 +57,11 @@ async function requireCirclelessUserDocument(user: User) {
   }
 }
 
+export const MAX_CIRCLE_NAME_LENGTH = 60;
+
 export async function createFamilyCircle(user: User, name: string): Promise<CreatedFamilyCircle> {
   const trimmedName = name.trim();
-  if (!trimmedName || trimmedName.length > 60) {
+  if (!trimmedName || trimmedName.length > MAX_CIRCLE_NAME_LENGTH) {
     throw new FamilyCircleError('invalid-name');
   }
 
@@ -148,6 +151,34 @@ export async function joinFamilyCircle(user: User, rawCode: string): Promise<str
 
   await batch.commit();
   return circleId;
+}
+
+export async function renameFamilyCircle(circleId: string, name: string): Promise<void> {
+  const trimmed = name.trim();
+  if (!trimmed || trimmed.length > MAX_CIRCLE_NAME_LENGTH) {
+    throw new FamilyCircleError('invalid-name');
+  }
+
+  await updateDoc(doc(firestore, 'familyCircles', circleId), {
+    name: trimmed,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function leaveFamilyCircle(user: User, circleId: string): Promise<void> {
+  const batch = writeBatch(firestore);
+
+  batch.delete(doc(firestore, 'familyCircles', circleId, 'members', user.uid));
+  batch.update(doc(firestore, 'familyCircles', circleId), {
+    memberIds: arrayRemove(user.uid),
+    updatedAt: serverTimestamp(),
+  });
+  batch.update(doc(firestore, 'users', user.uid), {
+    familyCircleId: null,
+    updatedAt: serverTimestamp(),
+  });
+
+  await batch.commit();
 }
 
 export async function rotateInviteCode(user: User, circleId: string): Promise<string> {

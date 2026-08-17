@@ -4,7 +4,11 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } fr
 import { Button } from '../../components/Button';
 import { InviteCodeCard } from '../../components/InviteCodeCard';
 import { TextInput } from '../../components/TextInput';
-import { FamilyCircleError, createFamilyCircle } from '../../services/familyCircles';
+import {
+  FamilyCircleError,
+  MAX_CIRCLE_NAME_LENGTH,
+  createFamilyCircle,
+} from '../../services/familyCircles';
 import { colors, spacing, typography } from '../../theme';
 
 function messageForError(error: unknown) {
@@ -101,8 +105,8 @@ export function CreateFamilyCircleScreen({
             value={name}
             onChangeText={setName}
             error={nameError}
-            placeholder="The Hennawis"
-            maxLength={60}
+            placeholder="Our family"
+            maxLength={MAX_CIRCLE_NAME_LENGTH}
             returnKeyType="go"
             onSubmitEditing={handleSubmit}
             editable={!submitting}
