@@ -446,6 +446,67 @@ describe('leaving a family circle', () => {
   });
 });
 
+describe('removing a member from a family circle', () => {
+  async function seedTwoMemberCircle() {
+    await seedCircle();
+    await addMember(JOINER);
+    await setMemberIds([OWNER, JOINER]);
+  }
+
+  it('lets the owner remove another member', async () => {
+    await seedTwoMemberCircle();
+
+    await assertSucceeds(leaveBatch(dbFor(OWNER), JOINER, [OWNER]).commit());
+  });
+
+  it('refuses a member removing anyone but themselves', async () => {
+    await seedTwoMemberCircle();
+    await addMember(STRANGER);
+    await setMemberIds([OWNER, JOINER, STRANGER]);
+
+    await assertFails(leaveBatch(dbFor(JOINER), STRANGER, [OWNER, JOINER]).commit());
+  });
+
+  it('refuses the owner removing themselves', async () => {
+    await seedTwoMemberCircle();
+
+    await assertFails(leaveBatch(dbFor(OWNER), OWNER, [JOINER]).commit());
+  });
+
+  it('refuses an owner dropping more than one member at a time', async () => {
+    await seedTwoMemberCircle();
+    await addMember(STRANGER);
+    await setMemberIds([OWNER, JOINER, STRANGER]);
+    const db = dbFor(OWNER);
+
+    await assertFails(
+      updateDoc(doc(db, 'familyCircles', CIRCLE), {
+        memberIds: [OWNER],
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('refuses an owner swapping a member for someone new', async () => {
+    await seedTwoMemberCircle();
+    const db = dbFor(OWNER);
+
+    await assertFails(
+      updateDoc(doc(db, 'familyCircles', CIRCLE), {
+        memberIds: [OWNER, STRANGER],
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('leaves a removed member unable to read the circle', async () => {
+    await seedTwoMemberCircle();
+    await leaveBatch(dbFor(OWNER), JOINER, [OWNER]).commit();
+
+    await assertFails(getDoc(doc(dbFor(JOINER), 'familyCircles', CIRCLE)));
+  });
+});
+
 describe('rotating the invite code', () => {
   it('lets the owner swap in a new code and drop the old one', async () => {
     await seedCircle();
