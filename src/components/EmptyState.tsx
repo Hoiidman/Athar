@@ -3,20 +3,31 @@ import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { cardCornerRadius, cardShadow, colors, spacing, typography } from '../theme';
 
-interface EmptyStateProps {
-  icon: keyof typeof Ionicons.glyphMap;
+type EmptyStateProps = {
   title: string;
   message: string;
   tone?: 'neutral' | 'error';
   children?: ReactNode;
-}
+} & (
+  | { icon: keyof typeof Ionicons.glyphMap; visual?: never }
+  | { visual: ReactNode; icon?: never }
+);
 
-export function EmptyState({ icon, title, message, tone = 'neutral', children }: EmptyStateProps) {
-  const accent = tone === 'error' ? colors.error : colors.primary;
+export function EmptyState({
+  icon,
+  visual,
+  title,
+  message,
+  tone = 'neutral',
+  children,
+}: EmptyStateProps) {
+  // The accent belongs to the button below; a glyph in the same clay would
+  // compete with it from 200px away.
+  const accent = tone === 'error' ? colors.error : colors.sageIcon;
 
   return (
     <View style={styles.card}>
-      <Ionicons name={icon} size={36} color={accent} />
+      {visual ?? (icon ? <Ionicons name={icon} size={36} color={accent} /> : null)}
       <Text style={styles.title} accessibilityRole={tone === 'error' ? 'alert' : 'header'}>
         {title}
       </Text>

@@ -4,6 +4,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActionRow } from '../../components/ActionRow';
 import { Avatar } from '../../components/Avatar';
+import { AvatarStack } from '../../components/AvatarStack';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
 import { SignOutButton } from '../../components/SignOutButton';
@@ -76,9 +77,9 @@ function CircleSection({
   if (!circleId) {
     return (
       <EmptyState
-        icon="people-outline"
-        title="No family circle yet"
-        message="Start one and invite your family, or join with a code they shared with you."
+        visual={<AvatarStack />}
+        title="Your circle is empty"
+        message="Invite the people you want to share with, or join an existing circle with a code."
       >
         <Button label="Create or join a circle" onPress={onSetUpCircle} />
       </EmptyState>

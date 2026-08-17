@@ -32,6 +32,10 @@ export const colors = {
   warning: '#8A6010',
 } as const;
 
+// Fills for the avatar preview. Each carries a white glyph at 5.4:1 or better,
+// which the lighter sage and amber of the reference could not.
+export const avatarFills = ['#B4472E', '#5F6E53', '#8F5F22'] as const;
+
 export const darkColors: Record<keyof typeof colors, string> = {
   background: '#191512',
   surface: '#241F1B',
