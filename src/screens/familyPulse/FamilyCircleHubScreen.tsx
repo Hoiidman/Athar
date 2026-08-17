@@ -81,7 +81,7 @@ function CircleSection({
         title="Your circle is empty"
         message="Invite the people you want to share with, or join an existing circle with a code."
       >
-        <Button label="Create or join a circle" onPress={onSetUpCircle} />
+        <Button label="Create a circle" hint="or join with a code" onPress={onSetUpCircle} />
       </EmptyState>
     );
   }
@@ -154,17 +154,19 @@ export function FamilyCircleHubScreen({
           />
         </Section>
 
-        <Section label="Account">
-          {isGuest ? (
+        {isGuest ? (
+          <Section label="Account">
             <ActionRow
-              icon="person-add"
-              title="Save your account"
-              subtitle="Add an email so you never lose your memories"
+              icon="mail-outline"
+              title="Add an email so you never lose your memories"
+              subtitle="Takes about 20 seconds"
               onPress={onUpgradeAccount}
             />
-          ) : null}
-          <SignOutButton />
-        </Section>
+          </Section>
+        ) : null}
+
+        <View style={styles.spacer} />
+        <SignOutButton />
       </ScrollView>
     </SafeAreaView>
   );
@@ -176,8 +178,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
+    flexGrow: 1,
     padding: spacing.sm,
     gap: spacing.md,
+  },
+  spacer: {
+    flex: 1,
+    minHeight: spacing.md,
   },
   header: {
     gap: spacing.xs,

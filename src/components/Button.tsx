@@ -12,6 +12,7 @@ export type ButtonVariant = 'primary' | 'secondary' | 'destructive' | 'quiet';
 
 interface ButtonProps {
   label: string;
+  hint?: string;
   onPress: () => void;
   variant?: ButtonVariant;
   disabled?: boolean;
@@ -22,6 +23,7 @@ interface ButtonProps {
 
 export function Button({
   label,
+  hint,
   onPress,
   variant = 'primary',
   disabled = false,
@@ -41,7 +43,7 @@ export function Button({
       onPress={onPress}
       disabled={!interactive}
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityLabel={accessibilityLabel ?? (hint ? `${label}, ${hint}` : label)}
       accessibilityState={{ disabled: !interactive, busy: loading }}
       style={({ pressed }) => [
         styles.base,
@@ -55,7 +57,10 @@ export function Button({
         // resize when it enters the loading state.
         <ActivityIndicator size="small" color={labelColor} />
       ) : (
-        <Text style={[styles.label, { color: labelColor }]}>{label}</Text>
+        <>
+          <Text style={[styles.label, { color: labelColor }]}>{label}</Text>
+          {hint ? <Text style={[styles.hint, { color: labelColor }]}>{hint}</Text> : null}
+        </>
       )}
     </Pressable>
   );
@@ -93,5 +98,10 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.label,
+  },
+  hint: {
+    ...typography.caption,
+    fontSize: 11,
+    marginTop: 1,
   },
 });

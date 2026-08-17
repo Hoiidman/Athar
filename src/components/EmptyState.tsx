@@ -32,7 +32,7 @@ export function EmptyState({
         {title}
       </Text>
       <Text style={styles.message}>{message}</Text>
-      {children}
+      {children ? <View style={styles.actions}>{children}</View> : null}
     </View>
   );
 }
@@ -47,6 +47,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.md,
     ...cardShadow,
+  },
+  actions: {
+    alignSelf: 'stretch',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
   },
   title: {
     ...typography.heading,
