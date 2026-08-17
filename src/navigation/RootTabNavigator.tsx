@@ -24,6 +24,7 @@ export function RootTabNavigator({ user }: { user: User }) {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
+        tabBarStyle: { backgroundColor: colors.tabBar, borderTopColor: colors.border },
         tabBarIcon: ({ focused, color, size }) => {
           const icons: Record<keyof RootTabParamList, [string, string]> = {
             Capture: ['camera', 'camera-outline'],

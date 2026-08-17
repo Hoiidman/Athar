@@ -21,14 +21,14 @@ export function ActionRow({ icon, title, subtitle, meta, onPress }: ActionRowPro
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
       <View style={styles.badge}>
-        <Ionicons name={icon} size={22} color={colors.textOnAccent} />
+        <Ionicons name={icon} size={22} color={colors.sageIcon} />
       </View>
       <View style={styles.text}>
         <Text style={styles.title}>{title}</Text>
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
       {meta ? <Text style={styles.meta}>{meta}</Text> : null}
-      <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+      <Ionicons name="chevron-forward" size={20} color={colors.border} />
     </Pressable>
   );
 }
@@ -52,8 +52,8 @@ const styles = StyleSheet.create({
   badge: {
     width: minTapTarget,
     height: minTapTarget,
-    borderRadius: minTapTarget / 2,
-    backgroundColor: colors.primary,
+    borderRadius: 12,
+    backgroundColor: 'rgba(124, 139, 111, 0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },

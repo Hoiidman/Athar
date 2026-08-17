@@ -32,7 +32,7 @@ function MemberRow({ member, onPress }: { member: FamilyCircleMember; onPress: (
         </View>
         <Text style={styles.meta}>{meta}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+      <Ionicons name="chevron-forward" size={20} color={colors.border} />
     </Pressable>
   );
 }

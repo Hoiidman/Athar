@@ -21,7 +21,7 @@ export function SignOutButton() {
 
   return (
     <View style={styles.container}>
-      <Button label="Sign out" variant="secondary" onPress={handlePress} loading={pending} />
+      <Button label="Sign out" variant="quiet" onPress={handlePress} loading={pending} />
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">
           {error}

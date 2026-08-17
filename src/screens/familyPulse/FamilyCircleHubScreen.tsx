@@ -194,10 +194,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   sectionLabel: {
-    ...typography.label,
+    ...typography.eyebrow,
     color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
   },
   identity: {
     flexDirection: 'row',

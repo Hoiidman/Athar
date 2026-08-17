@@ -1,7 +1,7 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 import { colors, minTapTarget, spacing, typography } from '../theme';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'destructive';
+export type ButtonVariant = 'primary' | 'secondary' | 'destructive' | 'quiet';
 
 interface ButtonProps {
   label: string;
@@ -22,7 +22,12 @@ export function Button({
   accessibilityLabel,
 }: ButtonProps) {
   const interactive = !disabled && !loading;
-  const isOutline = variant === 'secondary';
+  const labelColor =
+    variant === 'secondary'
+      ? colors.primary
+      : variant === 'quiet'
+        ? colors.textSecondary
+        : colors.textOnAccent;
 
   return (
     <Pressable
@@ -41,11 +46,9 @@ export function Button({
       {loading ? (
         // Rendered at the same height as the label so the button doesn't
         // resize when it enters the loading state.
-        <ActivityIndicator size="small" color={isOutline ? colors.primary : colors.textOnAccent} />
+        <ActivityIndicator size="small" color={labelColor} />
       ) : (
-        <Text style={[styles.label, isOutline ? styles.labelOutline : styles.labelFilled]}>
-          {label}
-        </Text>
+        <Text style={[styles.label, { color: labelColor }]}>{label}</Text>
       )}
     </Pressable>
   );
@@ -71,6 +74,9 @@ const styles = StyleSheet.create({
   destructive: {
     backgroundColor: colors.error,
   },
+  quiet: {
+    backgroundColor: 'transparent',
+  },
   pressed: {
     opacity: 0.7,
   },
@@ -79,11 +85,5 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.label,
-  },
-  labelFilled: {
-    color: colors.textOnAccent,
-  },
-  labelOutline: {
-    color: colors.primary,
   },
 });
