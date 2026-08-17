@@ -5,6 +5,7 @@ import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership
 import { UpgradeAccountScreen } from '../auth/UpgradeAccountScreen';
 import { FamilyCircleMembersScreen } from '../familyCircle/FamilyCircleMembersScreen';
 import { FamilyCircleOnboardingScreen } from '../familyCircle/FamilyCircleOnboardingScreen';
+import { FamilyCircleSettingsScreen } from '../familyCircle/FamilyCircleSettingsScreen';
 import { InviteScreen } from '../familyCircle/InviteScreen';
 import { MemberDetailScreen } from '../familyCircle/MemberDetailScreen';
 import { FamilyCircleHubScreen } from './FamilyCircleHubScreen';
@@ -14,6 +15,7 @@ export type FamilyPulseStackParamList = {
   FamilyCircleMembers: undefined;
   FamilyCircleMember: { userId: string };
   FamilyCircleInvite: undefined;
+  FamilyCircleSettings: undefined;
   FamilyCircleSetup: undefined;
   UpgradeAccount: undefined;
 };
@@ -40,6 +42,7 @@ export function FamilyPulseScreen({ user }: { user: User }) {
             onRetryMembership={retry}
             onOpenMembers={() => navigation.navigate('FamilyCircleMembers')}
             onOpenInvite={() => navigation.navigate('FamilyCircleInvite')}
+            onOpenSettings={() => navigation.navigate('FamilyCircleSettings')}
             onSetUpCircle={() => navigation.navigate('FamilyCircleSetup')}
             onUpgradeAccount={() => navigation.navigate('UpgradeAccount')}
           />
@@ -65,6 +68,12 @@ export function FamilyPulseScreen({ user }: { user: User }) {
       </Stack.Screen>
       <Stack.Screen name="FamilyCircleInvite" options={{ headerShown: true, title: 'Invite' }}>
         {() => <InviteScreen circleId={circleId} user={user} />}
+      </Stack.Screen>
+      <Stack.Screen
+        name="FamilyCircleSettings"
+        options={{ headerShown: true, title: 'Circle settings' }}
+      >
+        {() => <FamilyCircleSettingsScreen circleId={circleId} user={user} />}
       </Stack.Screen>
       <Stack.Screen name="UpgradeAccount" options={{ headerShown: true, title: 'Your account' }}>
         {({ navigation }) => (
