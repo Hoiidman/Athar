@@ -100,6 +100,15 @@ service cloud.firestore {
           && request.resource.data.updatedAt == request.time;
       }
 
+      function isRotateCode() {
+        return resource.data.ownerId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['inviteCode', 'updatedAt'])
+          && request.resource.data.inviteCode is string
+          && request.resource.data.inviteCode.size() <= 16
+          && request.resource.data.updatedAt == request.time
+          && getAfter(/databases/$(database)/documents/inviteCodes/$(request.resource.data.inviteCode)).data.familyCircleId == circleId;
+      }
+
       function isJoin() {
         return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds', 'updatedAt'])
           && !(request.auth.uid in resource.data.memberIds)
@@ -123,9 +132,8 @@ service cloud.firestore {
       allow update: if isSignedIn()
         && isValidCircle(request.resource.data)
         && request.resource.data.ownerId == resource.data.ownerId
-        && request.resource.data.inviteCode == resource.data.inviteCode
         && request.resource.data.createdAt == resource.data.createdAt
-        && (isRename() || isJoin());
+        && (isRename() || isJoin() || isRotateCode());
 
       allow delete: if false;
 
@@ -191,7 +199,14 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && getAfter(/databases/$(database)/documents/familyCircles/$(request.resource.data.familyCircleId)).data.ownerId == request.auth.uid;
 
-      allow update, delete: if false;
+      allow update: if false;
+
+      // Only as part of a rotation: the circle must already point somewhere
+      // else once the write lands, so an owner cannot strand their circle
+      // with a code nobody can look up.
+      allow delete: if isSignedIn()
+        && get(/databases/$(database)/documents/familyCircles/$(resource.data.familyCircleId)).data.ownerId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/familyCircles/$(resource.data.familyCircleId)).data.inviteCode != code;
     }
 
     match /{document=**} {

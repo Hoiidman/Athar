@@ -28,6 +28,7 @@ const CIRCLE = 'circle-1';
 const CODE = 'K7M2P9XR';
 const OTHER_CIRCLE = 'circle-2';
 const OTHER_CODE = 'A2B3C4D5';
+const NEW_CODE = 'N3W4C5D6';
 
 let testEnv: RulesTestEnvironment;
 
@@ -107,6 +108,20 @@ function joinBatch(db: Firestore, uid: string, circleId: string, code: string | 
     memberIds: arrayUnion(uid),
     updatedAt: serverTimestamp(),
   });
+  return batch;
+}
+
+function rotateBatch(db: Firestore, uid: string, oldCode: string, newCode: string) {
+  const batch = writeBatch(db);
+  batch.set(
+    doc(db, 'inviteCodes', newCode),
+    inviteCodeData({ familyCircleId: CIRCLE, createdBy: uid }),
+  );
+  batch.update(doc(db, 'familyCircles', CIRCLE), {
+    inviteCode: newCode,
+    updatedAt: serverTimestamp(),
+  });
+  batch.delete(doc(db, 'inviteCodes', oldCode));
   return batch;
 }
 
@@ -240,13 +255,13 @@ describe('modifying a family circle', () => {
     );
   });
 
-  it('refuses changing the invite code after creation', async () => {
+  it('refuses changing the invite code without creating the new code document', async () => {
     await seedCircle();
     const db = dbFor(OWNER);
 
     await assertFails(
       updateDoc(doc(db, 'familyCircles', CIRCLE), {
-        inviteCode: 'NEWCODE2',
+        inviteCode: NEW_CODE,
         updatedAt: serverTimestamp(),
       }),
     );
@@ -369,10 +384,46 @@ describe('invite codes', () => {
     await assertFails(updateDoc(doc(db, 'inviteCodes', CODE), { familyCircleId: OTHER_CIRCLE }));
   });
 
-  it('refuses deleting a code', async () => {
+  it('refuses deleting the code the circle still points at', async () => {
     await seedCircle();
 
     await assertFails(deleteDoc(doc(dbFor(OWNER), 'inviteCodes', CODE)));
+  });
+});
+
+describe('rotating the invite code', () => {
+  it('lets the owner swap in a new code and drop the old one', async () => {
+    await seedCircle();
+
+    await assertSucceeds(rotateBatch(dbFor(OWNER), OWNER, CODE, NEW_CODE).commit());
+  });
+
+  it('refuses a rotation by a member who does not own the circle', async () => {
+    await seedCircle();
+    await addMember(JOINER);
+
+    await assertFails(rotateBatch(dbFor(JOINER), JOINER, CODE, NEW_CODE).commit());
+  });
+
+  it('refuses pointing the circle at a code registered to another circle', async () => {
+    await seedCircle();
+    await seedOtherCircle();
+    const db = dbFor(OWNER);
+
+    await assertFails(
+      updateDoc(doc(db, 'familyCircles', CIRCLE), {
+        inviteCode: OTHER_CODE,
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('leaves the old code unusable for joining', async () => {
+    await seedCircle();
+    await rotateBatch(dbFor(OWNER), OWNER, CODE, NEW_CODE).commit();
+
+    await assertFails(joinBatch(dbFor(JOINER), JOINER, CIRCLE, CODE).commit());
+    await assertSucceeds(joinBatch(dbFor(JOINER), JOINER, CIRCLE, NEW_CODE).commit());
   });
 });
 
