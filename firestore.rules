@@ -117,6 +117,15 @@ service cloud.firestore {
           && getAfter(/databases/$(database)/documents/familyCircles/$(circleId)/members/$(request.auth.uid)).data.inviteCodeUsed is string;
       }
 
+      function isLeave() {
+        return resource.data.ownerId != request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds', 'updatedAt'])
+          && request.auth.uid in resource.data.memberIds
+          && request.resource.data.memberIds == resource.data.memberIds.removeAll([request.auth.uid])
+          && request.resource.data.updatedAt == request.time
+          && !existsAfter(/databases/$(database)/documents/familyCircles/$(circleId)/members/$(request.auth.uid));
+      }
+
       allow get: if isMember();
 
       allow list: if false;
@@ -133,7 +142,7 @@ service cloud.firestore {
         && isValidCircle(request.resource.data)
         && request.resource.data.ownerId == resource.data.ownerId
         && request.resource.data.createdAt == resource.data.createdAt
-        && (isRename() || isJoin() || isRotateCode());
+        && (isRename() || isJoin() || isRotateCode() || isLeave());
 
       allow delete: if false;
 
@@ -177,7 +186,9 @@ service cloud.firestore {
             || (isCircleOwner() && changesOnly(['relationship']))
           );
 
-        allow delete: if isOwner(userId);
+        // The circle owner is excluded: dropping their own membership would
+        // leave a circle nobody can administer and a name nobody can change.
+        allow delete: if isOwner(userId) && !isCircleOwner();
       }
     }
 

@@ -125,6 +125,16 @@ function rotateBatch(db: Firestore, uid: string, oldCode: string, newCode: strin
   return batch;
 }
 
+function leaveBatch(db: Firestore, uid: string, remaining: string[]) {
+  const batch = writeBatch(db);
+  batch.delete(doc(db, 'familyCircles', CIRCLE, 'members', uid));
+  batch.update(doc(db, 'familyCircles', CIRCLE), {
+    memberIds: remaining,
+    updatedAt: serverTimestamp(),
+  });
+  return batch;
+}
+
 async function seedOtherCircle() {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore() as unknown as Firestore;
@@ -143,6 +153,13 @@ async function addMember(uid: string) {
       doc(db, 'familyCircles', CIRCLE, 'members', uid),
       memberData({ userId: uid, role: 'member', inviteCodeUsed: CODE }),
     );
+  });
+}
+
+async function setMemberIds(ids: string[]) {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore() as unknown as Firestore;
+    await updateDoc(doc(db, 'familyCircles', CIRCLE), { memberIds: ids });
   });
 }
 
@@ -388,6 +405,44 @@ describe('invite codes', () => {
     await seedCircle();
 
     await assertFails(deleteDoc(doc(dbFor(OWNER), 'inviteCodes', CODE)));
+  });
+});
+
+describe('leaving a family circle', () => {
+  async function seedTwoMemberCircle() {
+    await seedCircle();
+    await addMember(JOINER);
+    await setMemberIds([OWNER, JOINER]);
+  }
+
+  it('lets a member drop their own membership and leave the list', async () => {
+    await seedTwoMemberCircle();
+
+    await assertSucceeds(leaveBatch(dbFor(JOINER), JOINER, [OWNER]).commit());
+  });
+
+  it('refuses the owner leaving their own circle', async () => {
+    await seedTwoMemberCircle();
+
+    await assertFails(leaveBatch(dbFor(OWNER), OWNER, [JOINER]).commit());
+  });
+
+  it('refuses dropping someone else from the list', async () => {
+    await seedTwoMemberCircle();
+
+    await assertFails(leaveBatch(dbFor(JOINER), OWNER, [JOINER]).commit());
+  });
+
+  it('refuses leaving the list while keeping the member document', async () => {
+    await seedTwoMemberCircle();
+    const db = dbFor(JOINER);
+
+    await assertFails(
+      updateDoc(doc(db, 'familyCircles', CIRCLE), {
+        memberIds: [OWNER],
+        updatedAt: serverTimestamp(),
+      }),
+    );
   });
 });
 
