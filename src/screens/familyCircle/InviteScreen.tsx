@@ -7,7 +7,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { InviteCodeCard } from '../../components/InviteCodeCard';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
 import { rotateInviteCode } from '../../services/familyCircles';
-import { colors, spacing, typography } from '../../theme';
+import { cardCornerRadius, cardShadow, colors, spacing, typography } from '../../theme';
 
 interface InviteScreenProps {
   circleId: string | null;
@@ -156,10 +156,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: cardCornerRadius,
     paddingVertical: spacing.md,
+    ...cardShadow,
   },
   qrHint: {
     ...typography.caption,

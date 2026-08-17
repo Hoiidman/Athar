@@ -2,7 +2,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from './Button';
-import { colors, spacing, typography } from '../theme';
+import { cardCornerRadius, cardShadow, colors, spacing, typography } from '../theme';
 
 export function InviteCodeCard({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
@@ -43,11 +43,10 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: cardCornerRadius,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+    ...cardShadow,
   },
   code: {
     ...typography.display,

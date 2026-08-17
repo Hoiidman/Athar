@@ -9,7 +9,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { SignOutButton } from '../../components/SignOutButton';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
 import type { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
-import { cardCornerRadius, colors, spacing, typography } from '../../theme';
+import { cardCornerRadius, cardShadow, colors, spacing, typography } from '../../theme';
 
 type MembershipState = ReturnType<typeof useFamilyCircleMembership>['state'];
 
@@ -218,9 +218,8 @@ const styles = StyleSheet.create({
   loadingCard: {
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: cardCornerRadius,
     paddingVertical: spacing.lg,
+    ...cardShadow,
   },
 });

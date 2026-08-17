@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { cardCornerRadius, colors, spacing, typography } from '../theme';
+import { cardCornerRadius, cardShadow, colors, spacing, typography } from '../theme';
 
 interface EmptyStateProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -32,11 +32,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: cardCornerRadius,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.md,
+    ...cardShadow,
   },
   title: {
     ...typography.heading,

@@ -1,5 +1,12 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
-import { colors, minTapTarget, spacing, typography } from '../theme';
+import {
+  accentShadow,
+  colors,
+  controlCornerRadius,
+  minTapTarget,
+  spacing,
+  typography,
+} from '../theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'destructive' | 'quiet';
 
@@ -59,12 +66,13 @@ const styles = StyleSheet.create({
     minHeight: minTapTarget,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    borderRadius: 12,
+    borderRadius: controlCornerRadius,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primary: {
     backgroundColor: colors.primary,
+    ...accentShadow,
   },
   secondary: {
     backgroundColor: 'transparent',

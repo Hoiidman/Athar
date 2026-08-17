@@ -6,7 +6,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { TextInput } from '../../components/TextInput';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
 import { MAX_RELATIONSHIP_LENGTH, setMemberRelationship } from '../../services/familyCircles';
-import { colors, spacing, typography } from '../../theme';
+import { cardCornerRadius, cardShadow, colors, spacing, typography } from '../../theme';
 
 interface MemberDetailScreenProps {
   circleId: string | null;
@@ -193,10 +193,9 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: cardCornerRadius,
     paddingHorizontal: spacing.sm,
+    ...cardShadow,
   },
   detail: {
     flexDirection: 'row',

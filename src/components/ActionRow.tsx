@@ -1,6 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { cardCornerRadius, colors, minTapTarget, spacing, typography } from '../theme';
+import {
+  cardCornerRadius,
+  cardShadow,
+  colors,
+  controlCornerRadius,
+  minTapTarget,
+  spacing,
+  typography,
+} from '../theme';
 
 interface ActionRowProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -28,7 +36,7 @@ export function ActionRow({ icon, title, subtitle, meta, onPress }: ActionRowPro
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
       {meta ? <Text style={styles.meta}>{meta}</Text> : null}
-      <Ionicons name="chevron-forward" size={20} color={colors.border} />
+      <Ionicons name="chevron-forward" size={20} color={colors.uiIcon} />
     </Pressable>
   );
 }
@@ -40,11 +48,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     minHeight: minTapTarget + spacing.sm,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: cardCornerRadius,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm,
+    ...cardShadow,
   },
   pressed: {
     opacity: 0.7,
@@ -52,7 +59,7 @@ const styles = StyleSheet.create({
   badge: {
     width: minTapTarget,
     height: minTapTarget,
-    borderRadius: 12,
+    borderRadius: controlCornerRadius,
     backgroundColor: 'rgba(124, 139, 111, 0.16)',
     alignItems: 'center',
     justifyContent: 'center',

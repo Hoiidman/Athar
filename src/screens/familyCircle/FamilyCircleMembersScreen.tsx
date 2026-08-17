@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from '
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
-import { colors, spacing, typography } from '../../theme';
+import { cardCornerRadius, cardShadow, colors, spacing, typography } from '../../theme';
 import type { FamilyCircleMember } from '../../types/familyCircle';
 
 function joinedLabel(joinedAt: number) {
@@ -32,7 +32,7 @@ function MemberRow({ member, onPress }: { member: FamilyCircleMember; onPress: (
         </View>
         <Text style={styles.meta}>{meta}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.border} />
+      <Ionicons name="chevron-forward" size={20} color={colors.uiIcon} />
     </Pressable>
   );
 }
@@ -136,11 +136,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: cardCornerRadius,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
+    ...cardShadow,
   },
   pressed: {
     opacity: 0.7,
