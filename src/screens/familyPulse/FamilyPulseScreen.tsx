@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { User } from 'firebase/auth';
 import { useState } from 'react';
 import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
+import { clearOwnFamilyCircleId } from '../../services/users';
 import { UpgradeAccountScreen } from '../auth/UpgradeAccountScreen';
 import { FamilyCircleMembersScreen } from '../familyCircle/FamilyCircleMembersScreen';
 import { FamilyCircleOnboardingScreen } from '../familyCircle/FamilyCircleOnboardingScreen';
@@ -43,6 +44,10 @@ export function FamilyPulseScreen({ user }: { user: User }) {
             onOpenMembers={() => navigation.navigate('FamilyCircleMembers')}
             onOpenInvite={() => navigation.navigate('FamilyCircleInvite')}
             onOpenSettings={() => navigation.navigate('FamilyCircleSettings')}
+            onCircleLost={() => {
+              void clearOwnFamilyCircleId(user.uid).catch(() => undefined);
+              adoptCircle(null);
+            }}
             onSetUpCircle={() => navigation.navigate('FamilyCircleSetup')}
             onUpgradeAccount={() => navigation.navigate('UpgradeAccount')}
           />

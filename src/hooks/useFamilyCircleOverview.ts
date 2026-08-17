@@ -10,7 +10,16 @@ export type FamilyCircleOverviewState =
   | { status: 'loading' }
   | { status: 'error' }
   | { status: 'missing' }
+  | { status: 'removed' }
   | { status: 'ready'; circle: FamilyCircleSummary; members: FamilyCircleMember[] };
+
+function isPermissionDenied(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === 'permission-denied'
+  );
+}
 
 export function useFamilyCircleOverview(circleId: string | null) {
   const [state, setState] = useState<FamilyCircleOverviewState>({ status: 'loading' });
@@ -34,8 +43,9 @@ export function useFamilyCircleOverview(circleId: string | null) {
         if (cancelled) return;
 
         setState(circle ? { status: 'ready', circle, members } : { status: 'missing' });
-      } catch {
-        if (!cancelled) setState({ status: 'error' });
+      } catch (error) {
+        if (cancelled) return;
+        setState({ status: isPermissionDenied(error) ? 'removed' : 'error' });
       }
     })();
 

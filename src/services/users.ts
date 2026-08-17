@@ -26,6 +26,13 @@ export async function setUserDisplayName(uid: string, displayName: string): Prom
   await updateDoc(doc(firestore, 'users', uid), { displayName, updatedAt: serverTimestamp() });
 }
 
+export async function clearOwnFamilyCircleId(uid: string): Promise<void> {
+  await updateDoc(doc(firestore, 'users', uid), {
+    familyCircleId: null,
+    updatedAt: serverTimestamp(),
+  });
+}
+
 export async function getFamilyCircleId(uid: string): Promise<string | null> {
   const snapshot = await getDoc(doc(firestore, 'users', uid));
   if (!snapshot.exists()) return null;

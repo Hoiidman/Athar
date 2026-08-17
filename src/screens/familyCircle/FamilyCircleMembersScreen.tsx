@@ -69,7 +69,7 @@ export function FamilyCircleMembersScreen({
     );
   }
 
-  if (state.status === 'missing') {
+  if (state.status === 'missing' || state.status === 'removed') {
     return (
       <View style={[styles.screen, styles.centred]}>
         <Text style={styles.message}>

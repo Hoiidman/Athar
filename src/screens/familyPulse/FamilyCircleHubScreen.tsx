@@ -1,5 +1,5 @@
 import type { User } from 'firebase/auth';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActionRow } from '../../components/ActionRow';
@@ -22,6 +22,7 @@ interface FamilyCircleHubScreenProps {
   onOpenMembers: () => void;
   onOpenInvite: () => void;
   onOpenSettings: () => void;
+  onCircleLost: () => void;
   onSetUpCircle: () => void;
   onUpgradeAccount: () => void;
 }
@@ -53,6 +54,7 @@ function CircleSection({
   onOpenMembers,
   onOpenInvite,
   onOpenSettings,
+  onCircleLost,
   onSetUpCircle,
 }: Pick<
   FamilyCircleHubScreenProps,
@@ -61,10 +63,15 @@ function CircleSection({
   | 'onOpenMembers'
   | 'onOpenInvite'
   | 'onOpenSettings'
+  | 'onCircleLost'
   | 'onSetUpCircle'
 >) {
   const circleId = state.status === 'ready' ? state.circleId : null;
   const { state: overview, reload } = useFamilyCircleOverview(circleId);
+
+  useEffect(() => {
+    if (overview.status === 'removed') onCircleLost();
+  }, [overview.status, onCircleLost]);
 
   if (state.status === 'loading') return <LoadingCard />;
 
@@ -87,6 +94,18 @@ function CircleSection({
         visual={<AvatarStack />}
         title="Your circle is empty"
         message="Invite the people you want to share with, or join an existing circle with a code."
+      >
+        <Button label="Create a circle" hint="or join with a code" onPress={onSetUpCircle} />
+      </EmptyState>
+    );
+  }
+
+  if (overview.status === 'removed') {
+    return (
+      <EmptyState
+        icon="person-remove-outline"
+        title="You are not in this circle any more"
+        message="Someone in the family removed you. You can start your own circle, or join another with a code."
       >
         <Button label="Create a circle" hint="or join with a code" onPress={onSetUpCircle} />
       </EmptyState>
@@ -147,6 +166,7 @@ export function FamilyCircleHubScreen({
   onOpenMembers,
   onOpenInvite,
   onOpenSettings,
+  onCircleLost,
   onSetUpCircle,
   onUpgradeAccount,
 }: FamilyCircleHubScreenProps) {
@@ -165,6 +185,7 @@ export function FamilyCircleHubScreen({
             onOpenMembers={onOpenMembers}
             onOpenInvite={onOpenInvite}
             onOpenSettings={onOpenSettings}
+            onCircleLost={onCircleLost}
             onSetUpCircle={onSetUpCircle}
           />
         </Section>

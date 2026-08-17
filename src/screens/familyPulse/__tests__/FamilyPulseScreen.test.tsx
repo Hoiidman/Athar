@@ -6,7 +6,10 @@ import { getFamilyCircleId } from '../../../services/users';
 import { FamilyPulseScreen } from '../FamilyPulseScreen';
 
 jest.mock('../../../services/auth', () => ({ signOut: jest.fn() }));
-jest.mock('../../../services/users', () => ({ getFamilyCircleId: jest.fn() }));
+jest.mock('../../../services/users', () => ({
+  getFamilyCircleId: jest.fn(),
+  clearOwnFamilyCircleId: jest.fn(),
+}));
 jest.mock('../../../services/familyCircles', () => ({
   createFamilyCircle: jest.fn(),
   joinFamilyCircle: jest.fn(),

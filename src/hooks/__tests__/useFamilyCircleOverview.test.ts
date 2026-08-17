@@ -47,6 +47,17 @@ describe('useFamilyCircleOverview', () => {
     });
   });
 
+  it('reads a refused circle as no longer being a member', async () => {
+    mockGetFamilyCircle.mockRejectedValue(Object.assign(new Error('denied'), {
+      code: 'permission-denied',
+    }));
+    mockListMembers.mockResolvedValue(members);
+
+    const { result } = await renderHook(() => useFamilyCircleOverview('circle-9'));
+
+    await waitFor(() => expect(result.current.state).toEqual({ status: 'removed' }));
+  });
+
   it('reports a missing circle without reading', async () => {
     const { result } = await renderHook(() => useFamilyCircleOverview(null));
 
