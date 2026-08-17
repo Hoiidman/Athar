@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootStackNavigator';
 import { CaptureItem, useCaptureSessionStore } from '../../store/captureSessionStore';
@@ -37,7 +38,7 @@ const FRAME_SIZE = 56;
 
 /**
  * Neighbours only exist to be swiped onto, so a video keeps a poster rather
- * than spinning up a player.
+ * than spinning up a second player alongside the one on screen.
  */
 function StaticMedia({ item }: { item: CaptureItem }) {
   if (item.kind === 'video') {
@@ -146,6 +147,13 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
 
   const dragX = useRef(new Animated.Value(0)).current;
 
+  // Passing null for a photo keeps the hook order stable without loading
+  // anything the player does not need.
+  const player = useVideoPlayer(selected?.kind === 'video' ? selected.uri : null, (instance) => {
+    instance.loop = true;
+    instance.play();
+  });
+
   // Snapping back to centre has to happen in the same commit that renders the
   // new selection, or the old image shows for a frame at the reset offset.
   useLayoutEffect(() => {
@@ -247,7 +255,20 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
           )}
 
           <View style={styles.stage}>
-            <StaticMedia item={selected} />
+            {selected.kind === 'video' ? (
+              <VideoView
+                player={player}
+                style={StyleSheet.absoluteFill}
+                contentFit="contain"
+                nativeControls={false}
+              />
+            ) : (
+              <Image
+                source={{ uri: selected.uri }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="contain"
+              />
+            )}
           </View>
         </Animated.View>
       </GestureDetector>
