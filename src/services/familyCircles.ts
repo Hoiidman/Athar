@@ -26,7 +26,8 @@ export type FamilyCircleErrorCode =
   | 'code-not-found'
   | 'code-generation-failed'
   | 'already-in-circle'
-  | 'invalid-relationship';
+  | 'invalid-relationship'
+  | 'circle-not-found';
 
 export class FamilyCircleError extends Error {
   constructor(readonly code: FamilyCircleErrorCode) {
@@ -147,6 +148,52 @@ export async function joinFamilyCircle(user: User, rawCode: string): Promise<str
 
   await batch.commit();
   return circleId;
+}
+
+export async function rotateInviteCode(user: User, circleId: string): Promise<string> {
+  const circleRef = doc(firestore, 'familyCircles', circleId);
+
+  const claimCode = async (candidate: string) => {
+    try {
+      await runTransaction(firestore, async (transaction) => {
+        const codeRef = doc(firestore, 'inviteCodes', candidate);
+        const circleSnapshot = await transaction.get(circleRef);
+        const existing = await transaction.get(codeRef);
+
+        if (!circleSnapshot.exists()) throw new FamilyCircleError('circle-not-found');
+        if (existing.exists()) throw new Error(CODE_TAKEN);
+
+        const previous = circleSnapshot.data().inviteCode as string | undefined;
+
+        transaction.set(codeRef, {
+          familyCircleId: circleId,
+          createdBy: user.uid,
+          createdAt: serverTimestamp(),
+        });
+        transaction.update(circleRef, {
+          inviteCode: candidate,
+          updatedAt: serverTimestamp(),
+        });
+        if (previous && previous !== candidate) {
+          transaction.delete(doc(firestore, 'inviteCodes', previous));
+        }
+      });
+      return true;
+    } catch (error) {
+      if (error instanceof Error && error.message === CODE_TAKEN) return false;
+      throw error;
+    }
+  };
+
+  try {
+    return await generateUniqueInviteCode(claimCode);
+  } catch (error) {
+    if (error instanceof FamilyCircleError) throw error;
+    if (error instanceof Error && error.message.startsWith('Could not generate')) {
+      throw new FamilyCircleError('code-generation-failed');
+    }
+    throw error;
+  }
 }
 
 export async function setMemberDisplayName(

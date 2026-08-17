@@ -6,6 +6,7 @@ import {
   createFamilyCircle,
   joinFamilyCircle,
   listFamilyCircleMembers,
+  rotateInviteCode,
 } from '../familyCircles';
 import { ensureUserDocument } from '../users';
 
@@ -51,17 +52,29 @@ const mockDoc = doc as jest.Mock;
 
 const user = { uid: 'user-1', displayName: 'Layla', email: null, photoURL: null } as User;
 
-function transactionSpy(existingCodes: string[] = []) {
-  const writes: { path: string; data: Record<string, unknown>; kind: 'set' | 'update' }[] = [];
+function transactionSpy(
+  existingCodes: string[] = [],
+  circle: Record<string, unknown> | null = {},
+) {
+  const writes: {
+    path: string;
+    data?: Record<string, unknown>;
+    kind: 'set' | 'update' | 'delete';
+  }[] = [];
   mockRunTransaction.mockImplementation(async (_db, updateFn) => {
     await updateFn({
       get: async (ref: { __path: string }) => ({
-        exists: () => existingCodes.some((code) => ref.__path.endsWith(code)),
+        exists: () =>
+          ref.__path.startsWith('familyCircles')
+            ? circle !== null
+            : existingCodes.some((code) => ref.__path.endsWith(code)),
+        data: () => circle,
       }),
       set: (ref: { __path: string }, data: Record<string, unknown>) =>
         writes.push({ path: ref.__path, data, kind: 'set' }),
       update: (ref: { __path: string }, data: Record<string, unknown>) =>
         writes.push({ path: ref.__path, data, kind: 'update' }),
+      delete: (ref: { __path: string }) => writes.push({ path: ref.__path, kind: 'delete' }),
     });
   });
   return writes;
@@ -220,6 +233,38 @@ describe('joinFamilyCircle', () => {
     expect(mockWriteBatch).not.toHaveBeenCalled();
   });
 
+});
+
+describe('rotateInviteCode', () => {
+  it('registers the new code, repoints the circle and drops the old code', async () => {
+    mockGetRandomBytes.mockReturnValue(bytesFor(0));
+    const writes = transactionSpy([], { inviteCode: 'OLDCODE1' });
+
+    const code = await rotateInviteCode(user, 'circle-9');
+
+    expect(code).toBe(CODE_A);
+    expect(writes).toEqual([
+      expect.objectContaining({
+        kind: 'set',
+        path: `inviteCodes/${CODE_A}`,
+        data: expect.objectContaining({ familyCircleId: 'circle-9', createdBy: 'user-1' }),
+      }),
+      expect.objectContaining({
+        kind: 'update',
+        path: 'familyCircles/circle-9',
+        data: expect.objectContaining({ inviteCode: CODE_A }),
+      }),
+      { kind: 'delete', path: 'inviteCodes/OLDCODE1' },
+    ]);
+  });
+
+  it('refuses to rotate a circle that is not there', async () => {
+    mockGetRandomBytes.mockReturnValue(bytesFor(0));
+    const writes = transactionSpy([], null);
+
+    await expect(rotateInviteCode(user, 'circle-9')).rejects.toThrow(FamilyCircleError);
+    expect(writes).toHaveLength(0);
+  });
 });
 
 describe('listFamilyCircleMembers', () => {
