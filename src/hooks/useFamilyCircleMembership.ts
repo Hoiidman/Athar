@@ -40,7 +40,7 @@ export function useFamilyCircleMembership(user: User | null) {
 
   // Create and join already know the id they produced, so adopting it directly
   // avoids a second read purely to learn what we were just told.
-  const adoptCircle = useCallback((circleId: string) => {
+  const adoptCircle = useCallback((circleId: string | null) => {
     setState({ status: 'ready', circleId });
   }, []);
 

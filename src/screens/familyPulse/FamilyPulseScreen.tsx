@@ -73,7 +73,16 @@ export function FamilyPulseScreen({ user }: { user: User }) {
         name="FamilyCircleSettings"
         options={{ headerShown: true, title: 'Circle settings' }}
       >
-        {() => <FamilyCircleSettingsScreen circleId={circleId} user={user} />}
+        {({ navigation }) => (
+          <FamilyCircleSettingsScreen
+            circleId={circleId}
+            user={user}
+            onLeft={() => {
+              adoptCircle(null);
+              navigation.popToTop();
+            }}
+          />
+        )}
       </Stack.Screen>
       <Stack.Screen name="UpgradeAccount" options={{ headerShown: true, title: 'Your account' }}>
         {({ navigation }) => (

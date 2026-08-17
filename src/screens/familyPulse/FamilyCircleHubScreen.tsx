@@ -133,7 +133,7 @@ function CircleSection({
       <ActionRow
         icon="settings"
         title="Settings"
-        subtitle="Change your circle's name"
+        subtitle="Your circle's name and membership"
         onPress={onOpenSettings}
       />
     </>
