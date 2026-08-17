@@ -1,4 +1,5 @@
 import { ActivityIndicator, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
 import { InviteCodeCard } from '../../components/InviteCodeCard';
@@ -60,6 +61,13 @@ export function InviteScreen({ circleId }: InviteScreenProps) {
 
       <InviteCodeCard code={inviteCode} />
 
+      <View style={styles.qr} accessibilityLabel="Invite code as a scannable code">
+        {/* Fixed black on white rather than theme colours — scanners need the
+            contrast, and it must not follow the palette into dark mode. */}
+        <QRCode value={inviteCode} size={180} color="#000000" backgroundColor="#FFFFFF" />
+        <Text style={styles.qrHint}>Or let them scan this while you are together.</Text>
+      </View>
+
       <Button label="Share invite" onPress={share} />
 
       <Text style={styles.footnote}>
@@ -93,6 +101,20 @@ const styles = StyleSheet.create({
   hint: {
     ...typography.body,
     color: colors.textSecondary,
+  },
+  qr: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingVertical: spacing.md,
+  },
+  qrHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   footnote: {
     ...typography.caption,
