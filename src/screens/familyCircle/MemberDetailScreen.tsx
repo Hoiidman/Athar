@@ -1,17 +1,74 @@
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
 import { TextInput } from '../../components/TextInput';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
-import { MAX_RELATIONSHIP_LENGTH, setMemberRelationship } from '../../services/familyCircles';
+import {
+  MAX_RELATIONSHIP_LENGTH,
+  removeFamilyCircleMember,
+  setMemberRelationship,
+} from '../../services/familyCircles';
 import { cardCornerRadius, cardShadow, colors, spacing, typography } from '../../theme';
 
 interface MemberDetailScreenProps {
   circleId: string | null;
   userId: string;
   currentUid: string;
+  onRemoved: () => void;
+}
+
+interface RemoveMemberProps {
+  circleId: string;
+  userId: string;
+  displayName: string;
+  onRemoved: () => void;
+}
+
+function RemoveMember({ circleId, userId, displayName, onRemoved }: RemoveMemberProps) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string>();
+
+  async function remove() {
+    setError(undefined);
+    setPending(true);
+    try {
+      await removeFamilyCircleMember(circleId, userId);
+      onRemoved();
+    } catch {
+      setError('Could not remove them. Check your connection and try again.');
+      setPending(false);
+    }
+  }
+
+  function confirmRemove() {
+    Alert.alert(
+      `Remove ${displayName}?`,
+      'They lose access to the circle straight away. They can join again with the invite code, so change it too if that is not what you want.',
+      [
+        { text: 'Keep them', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: remove },
+      ],
+    );
+  }
+
+  return (
+    <View style={styles.danger}>
+      <Button
+        label="Remove from circle"
+        variant="destructive"
+        onPress={confirmRemove}
+        loading={pending}
+        accessibilityLabel={`Remove ${displayName} from circle`}
+      />
+      {error ? (
+        <Text style={styles.error} accessibilityRole="alert">
+          {error}
+        </Text>
+      ) : null}
+    </View>
+  );
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
@@ -99,7 +156,12 @@ function RelationshipField({
   );
 }
 
-export function MemberDetailScreen({ circleId, userId, currentUid }: MemberDetailScreenProps) {
+export function MemberDetailScreen({
+  circleId,
+  userId,
+  currentUid,
+  onRemoved,
+}: MemberDetailScreenProps) {
   const { state, reload } = useFamilyCircleOverview(circleId);
 
   if (state.status === 'loading') {
@@ -159,6 +221,15 @@ export function MemberDetailScreen({ circleId, userId, currentUid }: MemberDetai
         <Detail label="Role" value={member.role === 'owner' ? 'Family owner' : 'Member'} />
         <Detail label="Joined" value={new Date(member.joinedAt).toLocaleDateString()} />
       </View>
+
+      {state.circle.ownerId === currentUid && userId !== currentUid ? (
+        <RemoveMember
+          circleId={state.circle.id}
+          userId={userId}
+          displayName={member.displayName}
+          onRemoved={onRemoved}
+        />
+      ) : null}
     </ScrollView>
   );
 }
@@ -176,6 +247,13 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.sm,
     gap: spacing.md,
+  },
+  danger: {
+    gap: spacing.xs,
+  },
+  error: {
+    ...typography.caption,
+    color: colors.error,
   },
   identity: {
     alignItems: 'center',

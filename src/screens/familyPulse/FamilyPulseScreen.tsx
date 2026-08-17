@@ -29,6 +29,7 @@ export function FamilyPulseScreen({ user }: { user: User }) {
   // linkWithCredential keeps the same uid, so onAuthStateChanged does not
   // reliably fire and `user.isAnonymous` can stay true in React's eyes.
   const [upgraded, setUpgraded] = useState(false);
+  const [memberRevision, setMemberRevision] = useState(0);
   const isGuest = user.isAnonymous && !upgraded;
   const circleId = state.status === 'ready' ? state.circleId : null;
 
@@ -56,6 +57,7 @@ export function FamilyPulseScreen({ user }: { user: User }) {
       <Stack.Screen name="FamilyCircleMembers" options={{ headerShown: true, title: 'Your circle' }}>
         {({ navigation }) => (
           <FamilyCircleMembersScreen
+            key={memberRevision}
             circleId={circleId}
             onOpenMember={(userId) => navigation.navigate('FamilyCircleMember', { userId })}
             onInvite={() => navigation.navigate('FamilyCircleInvite')}
@@ -63,11 +65,15 @@ export function FamilyPulseScreen({ user }: { user: User }) {
         )}
       </Stack.Screen>
       <Stack.Screen name="FamilyCircleMember" options={{ headerShown: true, title: 'Member' }}>
-        {({ route }) => (
+        {({ route, navigation }) => (
           <MemberDetailScreen
             circleId={circleId}
             userId={route.params.userId}
             currentUid={user.uid}
+            onRemoved={() => {
+              setMemberRevision((revision) => revision + 1);
+              navigation.goBack();
+            }}
           />
         )}
       </Stack.Screen>

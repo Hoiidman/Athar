@@ -181,6 +181,18 @@ export async function leaveFamilyCircle(user: User, circleId: string): Promise<v
   await batch.commit();
 }
 
+export async function removeFamilyCircleMember(circleId: string, userId: string): Promise<void> {
+  const batch = writeBatch(firestore);
+
+  batch.delete(doc(firestore, 'familyCircles', circleId, 'members', userId));
+  batch.update(doc(firestore, 'familyCircles', circleId), {
+    memberIds: arrayRemove(userId),
+    updatedAt: serverTimestamp(),
+  });
+
+  await batch.commit();
+}
+
 export async function rotateInviteCode(user: User, circleId: string): Promise<string> {
   const circleRef = doc(firestore, 'familyCircles', circleId);
 
