@@ -1,6 +1,7 @@
 import type { User } from 'firebase/auth';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import * as Linking from 'expo-linking';
 import QRCode from 'react-native-qrcode-svg';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
@@ -14,8 +15,16 @@ interface InviteScreenProps {
   user: User;
 }
 
+export function inviteLink(code: string) {
+  return Linking.createURL(`join/${code}`);
+}
+
 function inviteMessage(circleName: string, code: string) {
-  return `Join our family circle "${circleName}" on Athar. Open the app, choose Join a circle, and enter the code ${code}.`;
+  return [
+    `Join our family circle "${circleName}" on Athar.`,
+    inviteLink(code),
+    `If that link does nothing, open Athar, choose Join a circle, and enter the code ${code}.`,
+  ].join('\n\n');
 }
 
 export function InviteScreen({ circleId, user }: InviteScreenProps) {

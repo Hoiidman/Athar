@@ -8,6 +8,10 @@ import {
 } from '../../../services/familyCircles';
 import { InviteScreen } from '../InviteScreen';
 
+jest.mock('expo-linking', () => ({
+  createURL: (path: string) => `exp://127.0.0.1:8081/--/${path}`,
+}));
+
 jest.mock('../../../services/familyCircles', () => ({
   getFamilyCircle: jest.fn(),
   listFamilyCircleMembers: jest.fn(),
@@ -33,16 +37,18 @@ beforeEach(() => {
 });
 
 describe('InviteScreen', () => {
-  it('shares the invite code as plain text', async () => {
+  it('shares both a link and the bare code', async () => {
     const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
 
     const { findByRole } = await render(<InviteScreen circleId="circle-9" user={owner} />);
 
     await fireEvent.press(await findByRole('button', { name: 'Share invite' }));
 
-    await waitFor(() =>
-      expect(share).toHaveBeenCalledWith({ message: expect.stringContaining('K7M2P9XR') }),
-    );
+    await waitFor(() => expect(share).toHaveBeenCalled());
+
+    const { message } = share.mock.calls[0]?.[0] as { message: string };
+    expect(message).toContain('exp://127.0.0.1:8081/--/join/K7M2P9XR');
+    expect(message).toContain('enter the code K7M2P9XR');
 
     share.mockRestore();
   });
