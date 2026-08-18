@@ -7,7 +7,6 @@ import { Avatar } from '../../components/Avatar';
 import { AvatarStack } from '../../components/AvatarStack';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
-import { SignOutButton } from '../../components/SignOutButton';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
 import type { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
 import { cardCornerRadius, cardShadow, colors, spacing, typography } from '../../theme';
@@ -53,7 +52,6 @@ function CircleSection({
   onRetryMembership,
   onOpenMembers,
   onOpenInvite,
-  onOpenSettings,
   onCircleLost,
   onSetUpCircle,
 }: Pick<
@@ -62,7 +60,6 @@ function CircleSection({
   | 'onRetryMembership'
   | 'onOpenMembers'
   | 'onOpenInvite'
-  | 'onOpenSettings'
   | 'onCircleLost'
   | 'onSetUpCircle'
 >) {
@@ -149,12 +146,6 @@ function CircleSection({
         subtitle="Share your code with family"
         onPress={onOpenInvite}
       />
-      <ActionRow
-        icon="settings"
-        title="Settings"
-        subtitle="Your circle's name and membership"
-        onPress={onOpenSettings}
-      />
     </>
   );
 }
@@ -184,25 +175,27 @@ export function FamilyCircleHubScreen({
             onRetryMembership={onRetryMembership}
             onOpenMembers={onOpenMembers}
             onOpenInvite={onOpenInvite}
-            onOpenSettings={onOpenSettings}
             onCircleLost={onCircleLost}
             onSetUpCircle={onSetUpCircle}
           />
         </Section>
 
-        {isGuest ? (
-          <Section label="Account">
+        <Section label="Account">
+          {isGuest ? (
             <ActionRow
               icon="mail-outline"
               title="Add an email so you never lose your memories"
               subtitle="Takes about 20 seconds"
               onPress={onUpgradeAccount}
             />
-          </Section>
-        ) : null}
-
-        <View style={styles.spacer} />
-        <SignOutButton />
+          ) : null}
+          <ActionRow
+            icon="settings"
+            title="Settings"
+            subtitle="Your circle, and signing out"
+            onPress={onOpenSettings}
+          />
+        </Section>
       </ScrollView>
     </SafeAreaView>
   );
@@ -214,13 +207,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    flexGrow: 1,
     padding: spacing.sm,
     gap: spacing.md,
-  },
-  spacer: {
-    flex: 1,
-    minHeight: spacing.md,
   },
   header: {
     gap: spacing.xs,

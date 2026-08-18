@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
+import { SignOutButton } from '../../components/SignOutButton';
 import { TextInput } from '../../components/TextInput';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
 import {
@@ -109,16 +110,14 @@ function LeaveSection({ circle, user, onLeft }: LeaveSectionProps) {
   );
 }
 
-export function FamilyCircleSettingsScreen({
-  circleId,
-  user,
-  onLeft,
-}: FamilyCircleSettingsScreenProps) {
+function CircleSettings({ circleId, user, onLeft }: FamilyCircleSettingsScreenProps) {
   const { state, reload } = useFamilyCircleOverview(circleId);
+
+  if (!circleId) return null;
 
   if (state.status === 'loading') {
     return (
-      <View style={[styles.screen, styles.centred]}>
+      <View style={styles.loading}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
@@ -126,16 +125,14 @@ export function FamilyCircleSettingsScreen({
 
   if (state.status !== 'ready') {
     return (
-      <View style={[styles.screen, styles.centred]}>
-        <EmptyState
-          icon="cloud-offline-outline"
-          tone="error"
-          title="Can't reach your circle"
-          message="Check your connection and try again."
-        >
-          <Button label="Try again" variant="secondary" onPress={reload} />
-        </EmptyState>
-      </View>
+      <EmptyState
+        icon="cloud-offline-outline"
+        tone="error"
+        title="Can't reach your circle"
+        message="Check your connection and try again."
+      >
+        <Button label="Try again" variant="secondary" onPress={reload} />
+      </EmptyState>
     );
   }
 
@@ -143,7 +140,7 @@ export function FamilyCircleSettingsScreen({
   const isOwner = circle.ownerId === user.uid;
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <>
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Name</Text>
         {isOwner ? (
@@ -167,6 +164,19 @@ export function FamilyCircleSettingsScreen({
           <LeaveSection circle={circle} user={user} onLeft={onLeft} />
         )}
       </View>
+    </>
+  );
+}
+
+export function FamilyCircleSettingsScreen(props: FamilyCircleSettingsScreenProps) {
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <CircleSettings {...props} />
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Account</Text>
+        <SignOutButton />
+      </View>
     </ScrollView>
   );
 }
@@ -176,10 +186,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  centred: {
+  loading: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.lg,
   },
   content: {
     padding: spacing.sm,

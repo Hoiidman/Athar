@@ -9,6 +9,8 @@ import {
 } from '../../../services/familyCircles';
 import { FamilyCircleSettingsScreen } from '../FamilyCircleSettingsScreen';
 
+jest.mock('../../../services/auth', () => ({ signOut: jest.fn() }));
+
 jest.mock('../../../services/familyCircles', () => ({
   getFamilyCircle: jest.fn(),
   listFamilyCircleMembers: jest.fn(),
@@ -105,5 +107,13 @@ describe('FamilyCircleSettingsScreen', () => {
     await waitFor(() => expect(getByText(/cannot leave it/)).toBeTruthy());
     expect(queryByRole('button', { name: 'Leave circle' })).toBeFalsy();
   });
-});
+  it('still offers sign out when there is no circle to configure', async () => {
+    const { getByRole, queryByLabelText } = await render(
+      <FamilyCircleSettingsScreen circleId={null} user={member} onLeft={onLeft} />,
+    );
 
+    expect(getByRole('button', { name: 'Sign out' })).toBeTruthy();
+    expect(queryByLabelText('Circle name')).toBeFalsy();
+    expect(mockGetFamilyCircle).not.toHaveBeenCalled();
+  });
+});
