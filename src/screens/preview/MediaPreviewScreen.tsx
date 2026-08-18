@@ -1,42 +1,60 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
   Image,
+  Keyboard,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureType } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import * as Crypto from 'expo-crypto';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootStackNavigator';
 import { CaptureItem, useCaptureSessionStore } from '../../store/captureSessionStore';
-import { FILTERS, FilterId, TOOLS, ToolId } from './editorOptions';
+import { clampOverlayScale, DraggableItem, DragPosition } from './DraggableItem';
+import { FILTERS, FilterId, INK_COLORS, STICKERS, TOOLS, ToolId } from './editorOptions';
 import { colors, spacing, typography } from '../../theme';
 
 /* ------------------------------------------------------------------ *
  * Types and constants
  * ------------------------------------------------------------------ */
 
-interface MediaEdits {
-  filter: FilterId;
+interface TextOverlay {
+  id: string;
+  text: string;
+  color: string;
 }
 
-const EMPTY_EDITS: MediaEdits = { filter: 'none' };
+interface StickerOverlay {
+  id: string;
+  emoji: string;
+}
+
+interface MediaEdits {
+  filter: FilterId;
+  texts: TextOverlay[];
+  stickers: StickerOverlay[];
+}
+
+const EMPTY_EDITS: MediaEdits = { filter: 'none', texts: [], stickers: [] };
 
 function isEdited(edits: MediaEdits) {
-  return edits.filter !== 'none';
+  return edits.filter !== 'none' || edits.texts.length > 0 || edits.stickers.length > 0;
 }
 
 // Tools with an editor behind them. The rest join the rail as their panels
 // are built.
-const AVAILABLE_TOOLS: ToolId[] = ['filters', 'sounds'];
+const AVAILABLE_TOOLS: ToolId[] = ['text', 'filters', 'sounds', 'stickers'];
 
 // A full screen modal does not always report insets, and without a floor the
 // buttons land under the status bar where they cannot be tapped.
@@ -51,6 +69,9 @@ const SWIPE_CLOSE_DISTANCE = 130;
 const MAX_DOWN_DRAG = 200;
 const DRAG_RESISTANCE = 0.25;
 
+// Anything dropped below this line while dragging gets removed.
+const DELETE_ZONE_HEIGHT = 150;
+
 const FRAME_SIZE = 56;
 const TILE_SIZE = 64;
 
@@ -64,6 +85,26 @@ function dampDown(value: number) {
 /* ------------------------------------------------------------------ *
  * Hooks
  * ------------------------------------------------------------------ */
+
+/** Height the keyboard is covering, so the bottom bar can sit above it. */
+function useKeyboardOffset() {
+  const [offset, setOffset] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, (event) =>
+      setOffset(event.endCoordinates.height),
+    );
+    const hide = Keyboard.addListener(hideEvent, () => setOffset(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  return offset;
+}
 
 /**
  * Edits are kept per capture, with a snapshot pushed before every change so
@@ -138,10 +179,24 @@ function DiscardLayer({ visible, drag }: { visible: boolean; drag: Animated.Valu
   );
 }
 
+function DeleteZone({ active }: { active: boolean }) {
+  return (
+    <View style={styles.deleteZone} pointerEvents="none">
+      <View style={[styles.deleteTarget, active && styles.deleteTargetActive]}>
+        <Ionicons name="trash-outline" size={26} color={colors.surface} />
+      </View>
+      <Text style={styles.deleteHint}>
+        {active ? 'Release to remove' : 'Drag here to remove'}
+      </Text>
+    </View>
+  );
+}
+
 interface TopBarProps {
   topInset: number;
   position: number;
   total: number;
+  hidden: boolean;
   editing: boolean;
   canUndo: boolean;
   onClose: () => void;
@@ -153,6 +208,7 @@ function TopBar({
   topInset,
   position,
   total,
+  hidden,
   editing,
   canUndo,
   onClose,
@@ -161,8 +217,12 @@ function TopBar({
 }: TopBarProps) {
   return (
     <View
-      style={[styles.topBar, { paddingTop: Math.max(topInset, MIN_TOP_INSET) }]}
-      pointerEvents="box-none"
+      style={[
+        styles.topBar,
+        { paddingTop: Math.max(topInset, MIN_TOP_INSET) },
+        hidden && styles.hidden,
+      ]}
+      pointerEvents={hidden ? 'none' : 'box-none'}
     >
       <Pressable style={styles.roundButton} hitSlop={12} onPress={onClose}>
         <Ionicons name="close" size={26} color={colors.surface} />
@@ -206,6 +266,55 @@ function ToolRail({ onSelect }: { onSelect: (tool: ToolId) => void }) {
   );
 }
 
+function InkSwatches({ value, onChange }: { value: string; onChange: (color: string) => void }) {
+  return (
+    <>
+      {INK_COLORS.map((color) => (
+        <Pressable
+          key={color}
+          onPress={() => onChange(color)}
+          style={[
+            styles.swatch,
+            { backgroundColor: color },
+            color === value && styles.swatchActive,
+          ]}
+        />
+      ))}
+    </>
+  );
+}
+
+interface TextPanelProps {
+  draft: string;
+  inkColor: string;
+  onChangeDraft: (text: string) => void;
+  onChangeColor: (color: string) => void;
+  onCommit: () => void;
+}
+
+function TextPanel({ draft, inkColor, onChangeDraft, onChangeColor, onCommit }: TextPanelProps) {
+  return (
+    <View style={styles.panel}>
+      <TextInput
+        value={draft}
+        onChangeText={onChangeDraft}
+        autoFocus
+        placeholder="Say something"
+        placeholderTextColor={colors.textSecondary}
+        style={[styles.input, { color: inkColor }]}
+        onSubmitEditing={onCommit}
+        returnKeyType="done"
+      />
+      <View style={styles.swatchRow}>
+        <InkSwatches value={inkColor} onChange={onChangeColor} />
+        <Pressable style={styles.done} onPress={onCommit}>
+          <Text style={styles.doneText}>Add</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 interface FilterPanelProps {
   /** The photo being edited, so each tile previews the real thing. */
   previewUri?: string;
@@ -238,6 +347,20 @@ function FilterPanel({ previewUri, active, onSelect }: FilterPanelProps) {
           </Pressable>
         ))}
       </ScrollView>
+    </View>
+  );
+}
+
+function StickerPanel({ onPick }: { onPick: (emoji: string) => void }) {
+  return (
+    <View style={styles.panel}>
+      <View style={styles.stickerGrid}>
+        {STICKERS.map((emoji) => (
+          <Pressable key={emoji} onPress={() => onPick(emoji)}>
+            <Text style={styles.stickerChoice}>{emoji}</Text>
+          </Pressable>
+        ))}
+      </View>
     </View>
   );
 }
@@ -294,8 +417,9 @@ function Carousel({ items, selectedId, onSelect }: CarouselProps) {
 type Props = NativeStackScreenProps<RootStackParamList, 'MediaPreview'>;
 
 export function MediaPreviewScreen({ route, navigation }: Props) {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const keyboardOffset = useKeyboardOffset();
 
   const items = useCaptureSessionStore((state) => state.items);
   const removeItem = useCaptureSessionStore((state) => state.removeItem);
@@ -305,6 +429,10 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
 
   const [selectedId, setSelectedId] = useState(route.params.itemId);
   const [activeTool, setActiveTool] = useState<ToolId | null>(null);
+  const [draft, setDraft] = useState('');
+  const [inkColor, setInkColor] = useState<string>(INK_COLORS[0] ?? colors.surface);
+  const [draggingOverlay, setDraggingOverlay] = useState(false);
+  const [overDelete, setOverDelete] = useState(false);
 
   const index = Math.max(
     0,
@@ -316,8 +444,22 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   const edited = isEdited(current);
   const editMode = activeTool !== null || edited;
 
+  const swipeRef = useRef<GestureType | undefined>(undefined);
+  const pinchRef = useRef<GestureType | undefined>(undefined);
   const dragX = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
+
+  // Overlay scale lives here rather than in each item, so a pinch anywhere on
+  // screen can resize the one that was touched last — an item too small to fit
+  // two fingers is still resizable.
+  const overlayScales = useRef<Record<string, Animated.Value>>({});
+  const overlayScaleBase = useRef<Record<string, number>>({});
+  const activeOverlay = useRef<string | null>(null);
+
+  function scaleFor(id: string) {
+    if (!overlayScales.current[id]) overlayScales.current[id] = new Animated.Value(1);
+    return overlayScales.current[id];
+  }
 
   // Passing null for a photo keeps the hook order stable without loading
   // anything the player does not need.
@@ -340,6 +482,19 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
     ]).start();
   }
 
+  function requestClose() {
+    // Nothing to lose outside edit mode, so closing just closes.
+    if (!edited) {
+      navigation.goBack();
+      return;
+    }
+
+    Alert.alert('Close preview?', 'Your edits will be lost.', [
+      { text: 'Stay', style: 'cancel', onPress: springHome },
+      { text: 'Discard', style: 'destructive', onPress: () => navigation.goBack() },
+    ]);
+  }
+
   function slide(direction: 1 | -1) {
     const target = ordered[index + direction];
     if (!target) {
@@ -360,6 +515,7 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   const swipeGesture = useMemo(
     () =>
       Gesture.Pan()
+        .withRef(swipeRef)
         .maxPointers(1)
         .minDistance(15)
         .onUpdate((event) => {
@@ -399,17 +555,42 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
     [index, ordered, width, editMode, edited],
   );
 
-  function requestClose() {
-    // Nothing to lose outside edit mode, so closing just closes.
-    if (!edited) {
-      navigation.goBack();
-      return;
-    }
+  const overlayPinch = useMemo(
+    () =>
+      Gesture.Pinch()
+        .withRef(pinchRef)
+        .onUpdate((event) => {
+          const id = activeOverlay.current;
+          if (!id) return;
+          const base = overlayScaleBase.current[id] ?? 1;
+          scaleFor(id).setValue(clampOverlayScale(base * event.scale));
+        })
+        .onEnd((event) => {
+          const id = activeOverlay.current;
+          if (!id) return;
+          const base = overlayScaleBase.current[id] ?? 1;
+          overlayScaleBase.current[id] = clampOverlayScale(base * event.scale);
+        }),
+    [],
+  );
 
-    Alert.alert('Close preview?', 'Your edits will be lost.', [
-      { text: 'Stay', style: 'cancel', onPress: springHome },
-      { text: 'Discard', style: 'destructive', onPress: () => navigation.goBack() },
-    ]);
+  const stageGesture = useMemo(
+    () => Gesture.Simultaneous(swipeGesture, overlayPinch),
+    [swipeGesture, overlayPinch],
+  );
+
+  function handleOverlayMove(position: DragPosition) {
+    const over = position.y > height - DELETE_ZONE_HEIGHT;
+    setOverDelete((state) => (state === over ? state : over));
+  }
+
+  function handleOverlayEnd(kind: 'text' | 'sticker', id: string, position: DragPosition) {
+    setDraggingOverlay(false);
+    setOverDelete(false);
+    if (position.y <= height - DELETE_ZONE_HEIGHT) return;
+
+    if (kind === 'text') update({ texts: current.texts.filter((item) => item.id !== id) });
+    else update({ stickers: current.stickers.filter((item) => item.id !== id) });
   }
 
   function deleteCurrent() {
@@ -429,6 +610,25 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
     ]);
   }
 
+  function commitText() {
+    const text = draft.trim();
+    if (text) {
+      const id = Crypto.randomUUID();
+      activeOverlay.current = id;
+      update({ texts: [...current.texts, { id, text, color: inkColor }] });
+    }
+    setDraft('');
+    Keyboard.dismiss();
+    setActiveTool(null);
+  }
+
+  function addSticker(emoji: string) {
+    const id = Crypto.randomUUID();
+    activeOverlay.current = id;
+    update({ stickers: [...current.stickers, { id, emoji }] });
+    setActiveTool(null);
+  }
+
   if (!selected) {
     return (
       <View style={styles.empty}>
@@ -441,13 +641,14 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   }
 
   const filter = FILTERS.find((option) => option.id === current.filter) ?? FILTERS[0];
-  const dismissable = activeTool === 'filters' || activeTool === 'sounds';
+  const dismissable =
+    activeTool === 'filters' || activeTool === 'sounds' || activeTool === 'stickers';
 
   return (
     <View style={styles.container}>
       <DiscardLayer visible={edited} drag={dragY} />
 
-      <GestureDetector gesture={swipeGesture}>
+      <GestureDetector gesture={stageGesture}>
         <Animated.View
           style={[
             styles.stageWrapper,
@@ -490,6 +691,44 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
                 { backgroundColor: filter.color, opacity: filter.opacity },
               ]}
             />
+
+            {current.texts.map((overlay, position) => (
+              <DraggableItem
+                key={overlay.id}
+                x={40}
+                y={140 + position * 52}
+                scale={scaleFor(overlay.id)}
+                blocks={swipeRef}
+                pinchWith={pinchRef}
+                onActivate={() => {
+                  activeOverlay.current = overlay.id;
+                }}
+                onDragStart={() => setDraggingOverlay(true)}
+                onDragMove={handleOverlayMove}
+                onDragEnd={(dropped) => handleOverlayEnd('text', overlay.id, dropped)}
+              >
+                <Text style={[styles.overlayText, { color: overlay.color }]}>{overlay.text}</Text>
+              </DraggableItem>
+            ))}
+
+            {current.stickers.map((overlay, position) => (
+              <DraggableItem
+                key={overlay.id}
+                x={110 + position * 24}
+                y={220 + position * 30}
+                scale={scaleFor(overlay.id)}
+                blocks={swipeRef}
+                pinchWith={pinchRef}
+                onActivate={() => {
+                  activeOverlay.current = overlay.id;
+                }}
+                onDragStart={() => setDraggingOverlay(true)}
+                onDragMove={handleOverlayMove}
+                onDragEnd={(dropped) => handleOverlayEnd('sticker', overlay.id, dropped)}
+              >
+                <Text style={styles.overlaySticker}>{overlay.emoji}</Text>
+              </DraggableItem>
+            ))}
           </View>
         </Animated.View>
       </GestureDetector>
@@ -498,10 +737,13 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setActiveTool(null)} />
       )}
 
+      {draggingOverlay && <DeleteZone active={overDelete} />}
+
       <TopBar
         topInset={insets.top}
         position={index + 1}
         total={ordered.length}
+        hidden={draggingOverlay}
         editing={editMode}
         canUndo={canUndo}
         onClose={() => (activeTool ? setActiveTool(null) : requestClose())}
@@ -514,11 +756,24 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
           styles.bottom,
           {
             paddingBottom:
-              Math.max(insets.bottom, MIN_BOTTOM_INSET) + (activeTool === null ? 18 : 0),
+              keyboardOffset > 0
+                ? keyboardOffset
+                : Math.max(insets.bottom, MIN_BOTTOM_INSET) + (activeTool === null ? 18 : 0),
           },
+          draggingOverlay && styles.hidden,
         ]}
-        pointerEvents="box-none"
+        pointerEvents={draggingOverlay ? 'none' : 'box-none'}
       >
+        {activeTool === 'text' && (
+          <TextPanel
+            draft={draft}
+            inkColor={inkColor}
+            onChangeDraft={setDraft}
+            onChangeColor={setInkColor}
+            onCommit={commitText}
+          />
+        )}
+
         {activeTool === 'filters' && (
           <FilterPanel
             previewUri={selected.kind === 'photo' ? selected.uri : undefined}
@@ -526,6 +781,8 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
             onSelect={(next) => update({ filter: next })}
           />
         )}
+
+        {activeTool === 'stickers' && <StickerPanel onPick={addSticker} />}
 
         {activeTool === 'sounds' && <SoundsPanel />}
 
@@ -591,6 +848,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.sm,
   },
+  hidden: {
+    opacity: 0,
+  },
   roundButton: {
     width: 44,
     height: 44,
@@ -609,6 +869,36 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.surface,
     fontVariant: ['tabular-nums'],
+  },
+  deleteZone: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: DELETE_ZONE_HEIGHT,
+    zIndex: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  deleteTarget: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  deleteTargetActive: {
+    backgroundColor: colors.error,
+    borderColor: colors.surface,
+    transform: [{ scale: 1.15 }],
+  },
+  deleteHint: {
+    ...typography.caption,
+    color: colors.surface,
   },
   bottom: {
     position: 'absolute',
@@ -649,25 +939,46 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
   },
-  tile: {
-    width: TILE_SIZE,
-    height: TILE_SIZE,
-    borderRadius: 10,
+  input: {
+    ...typography.heading,
+    paddingHorizontal: spacing.md,
+  },
+  swatchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+  },
+  swatch: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     borderWidth: 2,
     borderColor: 'transparent',
-    overflow: 'hidden',
   },
-  tileActive: {
+  swatchActive: {
     borderColor: colors.surface,
   },
-  tileImage: {
-    ...StyleSheet.absoluteFillObject,
+  done: {
+    marginLeft: 'auto',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
   },
-  tileFallback: {
-    backgroundColor: '#3A3A3A',
+  doneText: {
+    ...typography.label,
+    color: colors.textOnAccent,
   },
-  tileWash: {
-    ...StyleSheet.absoluteFillObject,
+  stickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  stickerChoice: {
+    fontSize: 30,
   },
   strip: {
     // Pinned so an RTL locale does not flip the running order.
@@ -689,6 +1000,35 @@ const styles = StyleSheet.create({
   },
   frameActive: {
     borderColor: colors.surface,
+  },
+  tile: {
+    width: TILE_SIZE,
+    height: TILE_SIZE,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    overflow: 'hidden',
+  },
+  tileActive: {
+    borderColor: colors.surface,
+  },
+  tileImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  tileFallback: {
+    backgroundColor: '#3A3A3A',
+  },
+  tileWash: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  overlayText: {
+    ...typography.display,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  overlaySticker: {
+    fontSize: 56,
   },
   empty: {
     flex: 1,
