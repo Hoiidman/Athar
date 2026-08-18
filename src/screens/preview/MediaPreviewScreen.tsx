@@ -29,8 +29,21 @@ const MIN_TOP_INSET = 16;
 const MIN_BOTTOM_INSET = 12;
 
 const SWIPE_CHANGE_DISTANCE = 60;
+const SWIPE_CLOSE_DISTANCE = 130;
+
+// How far the stage can travel downwards, and how much of the drag past the
+// close threshold actually lands, so the screen never leaves a gap behind it.
+const MAX_DOWN_DRAG = 200;
+const DRAG_RESISTANCE = 0.25;
 
 const FRAME_SIZE = 56;
+
+function dampDown(value: number) {
+  if (value <= 0) return 0;
+  if (value <= SWIPE_CLOSE_DISTANCE) return value;
+  const past = (value - SWIPE_CLOSE_DISTANCE) * DRAG_RESISTANCE;
+  return Math.min(SWIPE_CLOSE_DISTANCE + past, MAX_DOWN_DRAG);
+}
 
 /* ------------------------------------------------------------------ *
  * Pieces
@@ -50,6 +63,26 @@ function StaticMedia({ item }: { item: CaptureItem }) {
   }
   return (
     <Image source={{ uri: item.uri }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+  );
+}
+
+/** Sits behind the stage and is uncovered as the preview is dragged down. */
+function DiscardLayer({ drag }: { drag: Animated.Value }) {
+  const progress = drag.interpolate({
+    inputRange: [0, SWIPE_CLOSE_DISTANCE],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <View style={styles.discardLayer} pointerEvents="none">
+      <Animated.View
+        style={[styles.discardBadge, { opacity: progress, transform: [{ scale: progress }] }]}
+      >
+        <Ionicons name="trash-outline" size={30} color={colors.surface} />
+        <Text style={styles.discardText}>Discard</Text>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -146,6 +179,7 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   const selected = ordered[index];
 
   const dragX = useRef(new Animated.Value(0)).current;
+  const dragY = useRef(new Animated.Value(0)).current;
 
   // Passing null for a photo keeps the hook order stable without loading
   // anything the player does not need.
@@ -158,15 +192,14 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   // new selection, or the old image shows for a frame at the reset offset.
   useLayoutEffect(() => {
     dragX.setValue(0);
-  }, [selectedId, dragX]);
+    dragY.setValue(0);
+  }, [selectedId, dragX, dragY]);
 
   function springHome() {
-    Animated.spring(dragX, {
-      toValue: 0,
-      friction: 8,
-      tension: 80,
-      useNativeDriver: false,
-    }).start();
+    Animated.parallel([
+      Animated.spring(dragX, { toValue: 0, friction: 8, tension: 80, useNativeDriver: false }),
+      Animated.spring(dragY, { toValue: 0, friction: 8, tension: 80, useNativeDriver: false }),
+    ]).start();
   }
 
   function slide(direction: 1 | -1) {
@@ -192,13 +225,30 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
         .maxPointers(1)
         .minDistance(15)
         .onUpdate((event) => {
+          const vertical =
+            event.translationY > 0 && Math.abs(event.translationY) > Math.abs(event.translationX);
+          if (vertical) {
+            dragY.setValue(dampDown(event.translationY));
+            dragX.setValue(0);
+            return;
+          }
+
           // Only towards a neighbour that exists, otherwise the stage stays
           // put rather than dragging black into view.
           const forward = event.translationX < 0;
           const blocked = forward ? !ordered[index + 1] : !ordered[index - 1];
           dragX.setValue(blocked ? 0 : event.translationX);
+          dragY.setValue(0);
         })
         .onEnd((event) => {
+          const vertical =
+            event.translationY > 0 && Math.abs(event.translationY) > Math.abs(event.translationX);
+          if (vertical) {
+            if (event.translationY > SWIPE_CLOSE_DISTANCE) navigation.goBack();
+            else springHome();
+            return;
+          }
+
           if (event.translationX <= -SWIPE_CHANGE_DISTANCE) slide(1);
           else if (event.translationX >= SWIPE_CHANGE_DISTANCE) slide(-1);
           else springHome();
@@ -237,9 +287,14 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      <DiscardLayer drag={dragY} />
+
       <GestureDetector gesture={swipeGesture}>
         <Animated.View
-          style={[styles.stageWrapper, { transform: [{ translateX: dragX }] }]}
+          style={[
+            styles.stageWrapper,
+            { transform: [{ translateX: dragX }, { translateY: dragY }] },
+          ]}
           collapsable={false}
         >
           {ordered[index - 1] && (
@@ -304,6 +359,20 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
+  },
+  discardLayer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    paddingTop: 90,
+  },
+  discardBadge: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  discardText: {
+    ...typography.label,
+    color: colors.surface,
   },
   stageWrapper: {
     ...StyleSheet.absoluteFillObject,
