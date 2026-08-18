@@ -17,11 +17,26 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootStackNavigator';
 import { CaptureItem, useCaptureSessionStore } from '../../store/captureSessionStore';
+import { FILTERS, FilterId, TOOLS, ToolId } from './editorOptions';
 import { colors, spacing, typography } from '../../theme';
 
 /* ------------------------------------------------------------------ *
- * Constants
+ * Types and constants
  * ------------------------------------------------------------------ */
+
+interface MediaEdits {
+  filter: FilterId;
+}
+
+const EMPTY_EDITS: MediaEdits = { filter: 'none' };
+
+function isEdited(edits: MediaEdits) {
+  return edits.filter !== 'none';
+}
+
+// Tools with an editor behind them. The rest join the rail as their panels
+// are built.
+const AVAILABLE_TOOLS: ToolId[] = ['filters', 'sounds'];
 
 // A full screen modal does not always report insets, and without a floor the
 // buttons land under the status bar where they cannot be tapped.
@@ -37,12 +52,47 @@ const MAX_DOWN_DRAG = 200;
 const DRAG_RESISTANCE = 0.25;
 
 const FRAME_SIZE = 56;
+const TILE_SIZE = 64;
 
 function dampDown(value: number) {
   if (value <= 0) return 0;
   if (value <= SWIPE_CLOSE_DISTANCE) return value;
   const past = (value - SWIPE_CLOSE_DISTANCE) * DRAG_RESISTANCE;
   return Math.min(SWIPE_CLOSE_DISTANCE + past, MAX_DOWN_DRAG);
+}
+
+/* ------------------------------------------------------------------ *
+ * Hooks
+ * ------------------------------------------------------------------ */
+
+/**
+ * Edits are kept per capture, with a snapshot pushed before every change so
+ * undo can walk back through them one step at a time.
+ */
+function usePreviewEdits(selectedId: string | undefined) {
+  const [edits, setEdits] = useState<Record<string, MediaEdits>>({});
+  const [history, setHistory] = useState<Record<string, MediaEdits[]>>({});
+
+  const current = (selectedId ? edits[selectedId] : undefined) ?? EMPTY_EDITS;
+  const canUndo = (selectedId ? (history[selectedId]?.length ?? 0) : 0) > 0;
+
+  function update(change: Partial<MediaEdits>) {
+    if (!selectedId) return;
+    const previous = edits[selectedId] ?? EMPTY_EDITS;
+    setHistory((state) => ({ ...state, [selectedId]: [...(state[selectedId] ?? []), previous] }));
+    setEdits((state) => ({ ...state, [selectedId]: { ...previous, ...change } }));
+  }
+
+  function undo() {
+    if (!selectedId) return;
+    const stack = history[selectedId] ?? [];
+    const previous = stack[stack.length - 1];
+    if (!previous) return;
+    setHistory((state) => ({ ...state, [selectedId]: stack.slice(0, -1) }));
+    setEdits((state) => ({ ...state, [selectedId]: previous }));
+  }
+
+  return { current, canUndo, update, undo };
 }
 
 /* ------------------------------------------------------------------ *
@@ -67,7 +117,7 @@ function StaticMedia({ item }: { item: CaptureItem }) {
 }
 
 /** Sits behind the stage and is uncovered as the preview is dragged down. */
-function DiscardLayer({ drag }: { drag: Animated.Value }) {
+function DiscardLayer({ visible, drag }: { visible: boolean; drag: Animated.Value }) {
   const progress = drag.interpolate({
     inputRange: [0, SWIPE_CLOSE_DISTANCE],
     outputRange: [0, 1],
@@ -76,12 +126,14 @@ function DiscardLayer({ drag }: { drag: Animated.Value }) {
 
   return (
     <View style={styles.discardLayer} pointerEvents="none">
-      <Animated.View
-        style={[styles.discardBadge, { opacity: progress, transform: [{ scale: progress }] }]}
-      >
-        <Ionicons name="trash-outline" size={30} color={colors.surface} />
-        <Text style={styles.discardText}>Discard</Text>
-      </Animated.View>
+      {visible && (
+        <Animated.View
+          style={[styles.discardBadge, { opacity: progress, transform: [{ scale: progress }] }]}
+        >
+          <Ionicons name="trash-outline" size={30} color={colors.surface} />
+          <Text style={styles.discardText}>Discard</Text>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -90,11 +142,23 @@ interface TopBarProps {
   topInset: number;
   position: number;
   total: number;
+  editing: boolean;
+  canUndo: boolean;
   onClose: () => void;
+  onUndo: () => void;
   onDelete: () => void;
 }
 
-function TopBar({ topInset, position, total, onClose, onDelete }: TopBarProps) {
+function TopBar({
+  topInset,
+  position,
+  total,
+  editing,
+  canUndo,
+  onClose,
+  onUndo,
+  onDelete,
+}: TopBarProps) {
   return (
     <View
       style={[styles.topBar, { paddingTop: Math.max(topInset, MIN_TOP_INSET) }]}
@@ -110,9 +174,78 @@ function TopBar({ topInset, position, total, onClose, onDelete }: TopBarProps) {
         </Text>
       </View>
 
-      <Pressable style={styles.roundButton} hitSlop={12} onPress={onDelete}>
-        <Ionicons name="trash-outline" size={22} color={colors.surface} />
-      </Pressable>
+      {editing ? (
+        canUndo ? (
+          <Pressable style={styles.roundButton} hitSlop={12} onPress={onUndo}>
+            <Ionicons name="arrow-undo" size={22} color={colors.surface} />
+          </Pressable>
+        ) : (
+          <View style={styles.roundButton} />
+        )
+      ) : (
+        <Pressable style={styles.roundButton} hitSlop={12} onPress={onDelete}>
+          <Ionicons name="trash-outline" size={22} color={colors.surface} />
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+function ToolRail({ onSelect }: { onSelect: (tool: ToolId) => void }) {
+  return (
+    <View style={styles.toolRail}>
+      {TOOLS.filter((tool) => AVAILABLE_TOOLS.includes(tool.id)).map((tool) => (
+        <Pressable key={tool.id} style={styles.tool} onPress={() => onSelect(tool.id)}>
+          <View style={styles.toolIcon}>
+            <Ionicons name={tool.icon} size={22} color={colors.surface} />
+          </View>
+          <Text style={styles.toolLabel}>{tool.label}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+interface FilterPanelProps {
+  /** The photo being edited, so each tile previews the real thing. */
+  previewUri?: string;
+  active: FilterId;
+  onSelect: (filter: FilterId) => void;
+}
+
+function FilterPanel({ previewUri, active, onSelect }: FilterPanelProps) {
+  return (
+    <View style={styles.panel}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.strip}
+      >
+        {FILTERS.map((option) => (
+          <Pressable
+            key={option.id}
+            style={[styles.tile, option.id === active && styles.tileActive]}
+            onPress={() => onSelect(option.id)}
+          >
+            {previewUri ? (
+              <Image source={{ uri: previewUri }} style={styles.tileImage} />
+            ) : (
+              <View style={[styles.tileImage, styles.tileFallback]} />
+            )}
+            <View
+              style={[styles.tileWash, { backgroundColor: option.color, opacity: option.opacity }]}
+            />
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function SoundsPanel() {
+  return (
+    <View style={styles.panel}>
+      <Text style={styles.panelNote}>No sounds in your library yet.</Text>
     </View>
   );
 }
@@ -171,12 +304,17 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   const ordered = useMemo(() => items.filter((item) => item.kind !== 'audio').reverse(), [items]);
 
   const [selectedId, setSelectedId] = useState(route.params.itemId);
+  const [activeTool, setActiveTool] = useState<ToolId | null>(null);
 
   const index = Math.max(
     0,
     ordered.findIndex((item) => item.id === selectedId),
   );
   const selected = ordered[index];
+
+  const { current, canUndo, update, undo } = usePreviewEdits(selected?.id);
+  const edited = isEdited(current);
+  const editMode = activeTool !== null || edited;
 
   const dragX = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
@@ -233,10 +371,10 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
             return;
           }
 
-          // Only towards a neighbour that exists, otherwise the stage stays
-          // put rather than dragging black into view.
+          // Paging is only offered outside edit mode, and only towards a
+          // neighbour that exists — otherwise the stage stays put.
           const forward = event.translationX < 0;
-          const blocked = forward ? !ordered[index + 1] : !ordered[index - 1];
+          const blocked = editMode || (forward ? !ordered[index + 1] : !ordered[index - 1]);
           dragX.setValue(blocked ? 0 : event.translationX);
           dragY.setValue(0);
         })
@@ -244,18 +382,35 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
           const vertical =
             event.translationY > 0 && Math.abs(event.translationY) > Math.abs(event.translationX);
           if (vertical) {
-            if (event.translationY > SWIPE_CLOSE_DISTANCE) navigation.goBack();
+            if (event.translationY > SWIPE_CLOSE_DISTANCE) requestClose();
             else springHome();
             return;
           }
 
+          if (editMode) {
+            springHome();
+            return;
+          }
           if (event.translationX <= -SWIPE_CHANGE_DISTANCE) slide(1);
           else if (event.translationX >= SWIPE_CHANGE_DISTANCE) slide(-1);
           else springHome();
         }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [index, ordered, width],
+    [index, ordered, width, editMode, edited],
   );
+
+  function requestClose() {
+    // Nothing to lose outside edit mode, so closing just closes.
+    if (!edited) {
+      navigation.goBack();
+      return;
+    }
+
+    Alert.alert('Close preview?', 'Your edits will be lost.', [
+      { text: 'Stay', style: 'cancel', onPress: springHome },
+      { text: 'Discard', style: 'destructive', onPress: () => navigation.goBack() },
+    ]);
+  }
 
   function deleteCurrent() {
     if (!selected) return;
@@ -285,9 +440,12 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
     );
   }
 
+  const filter = FILTERS.find((option) => option.id === current.filter) ?? FILTERS[0];
+  const dismissable = activeTool === 'filters' || activeTool === 'sounds';
+
   return (
     <View style={styles.container}>
-      <DiscardLayer drag={dragY} />
+      <DiscardLayer visible={edited} drag={dragY} />
 
       <GestureDetector gesture={swipeGesture}>
         <Animated.View
@@ -324,29 +482,59 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
                 resizeMode="contain"
               />
             )}
+
+            <View
+              pointerEvents="none"
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: filter.color, opacity: filter.opacity },
+              ]}
+            />
           </View>
         </Animated.View>
       </GestureDetector>
+
+      {dismissable && (
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setActiveTool(null)} />
+      )}
 
       <TopBar
         topInset={insets.top}
         position={index + 1}
         total={ordered.length}
-        onClose={() => navigation.goBack()}
+        editing={editMode}
+        canUndo={canUndo}
+        onClose={() => (activeTool ? setActiveTool(null) : requestClose())}
+        onUndo={undo}
         onDelete={deleteCurrent}
       />
 
-      {ordered.length > 1 && (
-        <View
-          style={[
-            styles.bottom,
-            { paddingBottom: Math.max(insets.bottom, MIN_BOTTOM_INSET) + 18 },
-          ]}
-          pointerEvents="box-none"
-        >
+      <View
+        style={[
+          styles.bottom,
+          {
+            paddingBottom:
+              Math.max(insets.bottom, MIN_BOTTOM_INSET) + (activeTool === null ? 18 : 0),
+          },
+        ]}
+        pointerEvents="box-none"
+      >
+        {activeTool === 'filters' && (
+          <FilterPanel
+            previewUri={selected.kind === 'photo' ? selected.uri : undefined}
+            active={current.filter}
+            onSelect={(next) => update({ filter: next })}
+          />
+        )}
+
+        {activeTool === 'sounds' && <SoundsPanel />}
+
+        {activeTool === null && <ToolRail onSelect={setActiveTool} />}
+
+        {activeTool === null && ordered.length > 1 && (
           <Carousel items={ordered} selectedId={selected.id} onSelect={setSelectedId} />
-        </View>
-      )}
+        )}
+      </View>
     </View>
   );
 }
@@ -428,6 +616,58 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 2,
+    gap: spacing.sm,
+  },
+  toolRail: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: spacing.sm,
+  },
+  tool: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  toolIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toolLabel: {
+    ...typography.caption,
+    color: colors.surface,
+  },
+  panel: {
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+  },
+  panelNote: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  tile: {
+    width: TILE_SIZE,
+    height: TILE_SIZE,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    overflow: 'hidden',
+  },
+  tileActive: {
+    borderColor: colors.surface,
+  },
+  tileImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  tileFallback: {
+    backgroundColor: '#3A3A3A',
+  },
+  tileWash: {
+    ...StyleSheet.absoluteFillObject,
   },
   strip: {
     // Pinned so an RTL locale does not flip the running order.
