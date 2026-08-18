@@ -1,13 +1,23 @@
 import type { User } from 'firebase/auth';
 import { useEffect, type ReactNode } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActionRow } from '../../components/ActionRow';
 import { Avatar } from '../../components/Avatar';
 import { AvatarStack } from '../../components/AvatarStack';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
-import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
+import {
+  useFamilyCircleOverview,
+  type FamilyCircleOverviewState,
+} from '../../hooks/useFamilyCircleOverview';
 import type { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
 import { cardCornerRadius, cardShadow, colors, spacing, typography } from '../../theme';
 
@@ -47,28 +57,25 @@ function LoadingCard() {
   );
 }
 
+interface CircleSectionProps
+  extends Pick<
+    FamilyCircleHubScreenProps,
+    'state' | 'onRetryMembership' | 'onOpenMembers' | 'onOpenInvite' | 'onSetUpCircle'
+  > {
+  overview: FamilyCircleOverviewState;
+  reload: () => void;
+}
+
 function CircleSection({
   state,
+  overview,
+  reload,
   onRetryMembership,
   onOpenMembers,
   onOpenInvite,
-  onCircleLost,
   onSetUpCircle,
-}: Pick<
-  FamilyCircleHubScreenProps,
-  | 'state'
-  | 'onRetryMembership'
-  | 'onOpenMembers'
-  | 'onOpenInvite'
-  | 'onCircleLost'
-  | 'onSetUpCircle'
->) {
+}: CircleSectionProps) {
   const circleId = state.status === 'ready' ? state.circleId : null;
-  const { state: overview, reload } = useFamilyCircleOverview(circleId);
-
-  useEffect(() => {
-    if (overview.status === 'removed') onCircleLost();
-  }, [overview.status, onCircleLost]);
 
   if (state.status === 'loading') return <LoadingCard />;
 
@@ -161,9 +168,31 @@ export function FamilyCircleHubScreen({
   onSetUpCircle,
   onUpgradeAccount,
 }: FamilyCircleHubScreenProps) {
+  const circleId = state.status === 'ready' ? state.circleId : null;
+  const { state: overview, reload, refresh, refreshing } = useFamilyCircleOverview(circleId);
+
+  useEffect(() => {
+    if (overview.status === 'removed') onCircleLost();
+  }, [overview.status, onCircleLost]);
+
+  function pullToRefresh() {
+    onRetryMembership();
+    refresh();
+  }
+
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={pullToRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Family Pulse</Text>
           <Text style={styles.tagline}>Keep up with the people you share memories with.</Text>
@@ -172,10 +201,11 @@ export function FamilyCircleHubScreen({
         <Section label="Your circle">
           <CircleSection
             state={state}
+            overview={overview}
+            reload={reload}
             onRetryMembership={onRetryMembership}
             onOpenMembers={onOpenMembers}
             onOpenInvite={onOpenInvite}
-            onCircleLost={onCircleLost}
             onSetUpCircle={onSetUpCircle}
           />
         </Section>

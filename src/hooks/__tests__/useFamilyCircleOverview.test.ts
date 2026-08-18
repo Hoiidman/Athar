@@ -64,4 +64,31 @@ describe('useFamilyCircleOverview', () => {
     expect(result.current.state).toEqual({ status: 'missing' });
     expect(mockGetFamilyCircle).not.toHaveBeenCalled();
   });
+
+  it('keeps the loaded circle on screen while a refresh is in flight', async () => {
+    mockGetFamilyCircle.mockResolvedValue(circle);
+    mockListMembers.mockResolvedValue(members);
+
+    const { result } = await renderHook(() => useFamilyCircleOverview('circle-9'));
+    await waitFor(() => expect(result.current.state.status).toBe('ready'));
+
+    let release: (value: unknown) => void = () => {};
+    mockGetFamilyCircle.mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+
+    await act(async () => result.current.refresh());
+
+    expect(result.current.refreshing).toBe(true);
+    expect(result.current.state).toEqual({ status: 'ready', circle, members });
+
+    await act(async () => {
+      release(circle);
+    });
+
+    await waitFor(() => expect(result.current.refreshing).toBe(false));
+    expect(result.current.state).toEqual({ status: 'ready', circle, members });
+  });
 });

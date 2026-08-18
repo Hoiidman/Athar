@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   getFamilyCircle,
   listFamilyCircleMembers,
@@ -24,15 +24,19 @@ function isPermissionDenied(error: unknown) {
 export function useFamilyCircleOverview(circleId: string | null) {
   const [state, setState] = useState<FamilyCircleOverviewState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const keepVisible = useRef(false);
 
   useEffect(() => {
     if (!circleId) {
       setState({ status: 'missing' });
+      setRefreshing(false);
       return;
     }
 
     let cancelled = false;
-    setState({ status: 'loading' });
+    if (!keepVisible.current) setState({ status: 'loading' });
+    keepVisible.current = false;
 
     void (async () => {
       try {
@@ -46,6 +50,8 @@ export function useFamilyCircleOverview(circleId: string | null) {
       } catch (error) {
         if (cancelled) return;
         setState({ status: isPermissionDenied(error) ? 'removed' : 'error' });
+      } finally {
+        if (!cancelled) setRefreshing(false);
       }
     })();
 
@@ -56,5 +62,11 @@ export function useFamilyCircleOverview(circleId: string | null) {
 
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
-  return { state, reload };
+  const refresh = useCallback(() => {
+    keepVisible.current = true;
+    setRefreshing(true);
+    setAttempt((n) => n + 1);
+  }, []);
+
+  return { state, reload, refresh, refreshing };
 }

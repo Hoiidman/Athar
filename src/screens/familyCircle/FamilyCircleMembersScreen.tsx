@@ -48,7 +48,7 @@ export function FamilyCircleMembersScreen({
   onOpenMember,
   onInvite,
 }: FamilyCircleMembersScreenProps) {
-  const { state, reload } = useFamilyCircleOverview(circleId);
+  const { state, reload, refresh, refreshing } = useFamilyCircleOverview(circleId);
 
   if (state.status === 'loading') {
     return (
@@ -83,6 +83,8 @@ export function FamilyCircleMembersScreen({
     <FlatList
       style={styles.screen}
       contentContainerStyle={styles.list}
+      refreshing={refreshing}
+      onRefresh={refresh}
       data={state.members}
       keyExtractor={(member) => member.userId}
       renderItem={({ item }) => (
