@@ -22,6 +22,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootStackNavigator';
 import { CaptureItem, useCaptureSessionStore } from '../../store/captureSessionStore';
 import { clampOverlayScale, DraggableItem, DragPosition } from './DraggableItem';
+import { DrawCanvas, Stroke } from './DrawCanvas';
 import { FILTERS, FilterId, INK_COLORS, STICKERS, TOOLS, ToolId } from './editorOptions';
 import { colors, spacing, typography } from '../../theme';
 
@@ -44,17 +45,21 @@ interface MediaEdits {
   filter: FilterId;
   texts: TextOverlay[];
   stickers: StickerOverlay[];
+  strokes: Stroke[];
 }
 
-const EMPTY_EDITS: MediaEdits = { filter: 'none', texts: [], stickers: [] };
+const EMPTY_EDITS: MediaEdits = { filter: 'none', texts: [], stickers: [], strokes: [] };
 
 function isEdited(edits: MediaEdits) {
-  return edits.filter !== 'none' || edits.texts.length > 0 || edits.stickers.length > 0;
+  return (
+    edits.filter !== 'none' ||
+    edits.texts.length > 0 ||
+    edits.stickers.length > 0 ||
+    edits.strokes.length > 0
+  );
 }
 
-// Tools with an editor behind them. The rest join the rail as their panels
-// are built.
-const AVAILABLE_TOOLS: ToolId[] = ['text', 'filters', 'sounds', 'stickers'];
+const AVAILABLE_TOOLS: ToolId[] = ['text', 'filters', 'sounds', 'stickers', 'draw'];
 
 // A full screen modal does not always report insets, and without a floor the
 // buttons land under the status bar where they cannot be tapped.
@@ -315,6 +320,25 @@ function TextPanel({ draft, inkColor, onChangeDraft, onChangeColor, onCommit }: 
   );
 }
 
+interface DrawPanelProps {
+  inkColor: string;
+  onChangeColor: (color: string) => void;
+  onDone: () => void;
+}
+
+function DrawPanel({ inkColor, onChangeColor, onDone }: DrawPanelProps) {
+  return (
+    <View style={styles.panel}>
+      <View style={styles.swatchRow}>
+        <InkSwatches value={inkColor} onChange={onChangeColor} />
+        <Pressable style={styles.done} onPress={onDone}>
+          <Text style={styles.doneText}>Done</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 interface FilterPanelProps {
   /** The photo being edited, so each tile previews the real thing. */
   previewUri?: string;
@@ -516,6 +540,8 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
     () =>
       Gesture.Pan()
         .withRef(swipeRef)
+        // Strokes would otherwise read as swipes across the stage.
+        .enabled(activeTool !== 'draw')
         .maxPointers(1)
         .minDistance(15)
         .onUpdate((event) => {
@@ -552,7 +578,7 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
           else springHome();
         }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [index, ordered, width, editMode, edited],
+    [index, ordered, width, editMode, edited, activeTool],
   );
 
   const overlayPinch = useMemo(
@@ -692,6 +718,14 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
               ]}
             />
 
+            <DrawCanvas
+              strokes={current.strokes}
+              color={inkColor}
+              width={6}
+              drawing={activeTool === 'draw'}
+              onAddStroke={(stroke) => update({ strokes: [...current.strokes, stroke] })}
+            />
+
             {current.texts.map((overlay, position) => (
               <DraggableItem
                 key={overlay.id}
@@ -779,6 +813,14 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
             previewUri={selected.kind === 'photo' ? selected.uri : undefined}
             active={current.filter}
             onSelect={(next) => update({ filter: next })}
+          />
+        )}
+
+        {activeTool === 'draw' && (
+          <DrawPanel
+            inkColor={inkColor}
+            onChangeColor={setInkColor}
+            onDone={() => setActiveTool(null)}
           />
         )}
 
