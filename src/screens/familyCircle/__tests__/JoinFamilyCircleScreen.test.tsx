@@ -60,4 +60,19 @@ describe('JoinFamilyCircleScreen', () => {
     await fireEvent.press(getByRole('button', { name: 'Join circle' }));
     expect(await findByText('You already belong to a family circle.')).toBeTruthy();
   });
+
+  it('joins with a code that arrived in a link, without it being typed', async () => {
+    mockJoinFamilyCircle.mockResolvedValue('circle-9');
+    const onJoined = jest.fn();
+    const { getByLabelText, getByRole } = await render(
+      <JoinFamilyCircleScreen user={user} initialCode="K7M2P9XR" onJoined={onJoined} />,
+    );
+
+    expect(getByLabelText('Invite code').props.value).toBe('K7M2P9XR');
+
+    await fireEvent.press(getByRole('button', { name: 'Join circle' }));
+
+    expect(mockJoinFamilyCircle).toHaveBeenCalledWith(user, 'K7M2P9XR');
+    expect(onJoined).toHaveBeenCalledWith('circle-9');
+  });
 });

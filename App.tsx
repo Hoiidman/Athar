@@ -12,6 +12,7 @@ import { useAuth } from './src/hooks/useAuth';
 import { useCircleOnboardingSkip } from './src/hooks/useCircleOnboardingSkip';
 import { useEnsureUserDocument } from './src/hooks/useEnsureUserDocument';
 import { useFamilyCircleMembership } from './src/hooks/useFamilyCircleMembership';
+import { usePendingInviteCode } from './src/hooks/usePendingInviteCode';
 import { colors, spacing, typography } from './src/theme';
 
 function Splash() {
@@ -33,7 +34,13 @@ function RetryNotice({ message, onRetry }: { message: string; onRetry: () => voi
   );
 }
 
-function SignedInRoutes({ user }: { user: User }) {
+interface SignedInRoutesProps {
+  user: User;
+  inviteCode: string | null;
+  onInviteUsed: () => void;
+}
+
+function SignedInRoutes({ user, inviteCode, onInviteUsed }: SignedInRoutesProps) {
   const userDocument = useEnsureUserDocument(user);
   const { state, retry, adoptCircle } = useFamilyCircleMembership(user);
   const onboardingSkip = useCircleOnboardingSkip(user.uid);
@@ -58,25 +65,41 @@ function SignedInRoutes({ user }: { user: User }) {
     );
   }
 
-  if (state.circleId || onboardingSkip.skipped) return <RootTabNavigator user={user} />;
+  if (state.circleId || (onboardingSkip.skipped && !inviteCode)) {
+    return <RootTabNavigator user={user} />;
+  }
 
   return (
     <FamilyCircleOnboardingScreen
       user={user}
-      onCircleReady={adoptCircle}
-      onSkip={onboardingSkip.skip}
+      initialInviteCode={inviteCode}
+      onCircleReady={(circleId) => {
+        onInviteUsed();
+        adoptCircle(circleId);
+      }}
+      onSkip={() => {
+        onInviteUsed();
+        onboardingSkip.skip();
+      }}
     />
   );
 }
 
 export default function App() {
   const { user, initializing } = useAuth();
+  const invite = usePendingInviteCode();
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <NavigationContainer>
-          {initializing ? <Splash /> : user ? <SignedInRoutes user={user} /> : <AuthNavigator />}
+          {initializing ? (
+            <Splash />
+          ) : user ? (
+            <SignedInRoutes user={user} inviteCode={invite.code} onInviteUsed={invite.clear} />
+          ) : (
+            <AuthNavigator />
+          )}
         </NavigationContainer>
         <StatusBar style="auto" />
       </SafeAreaProvider>

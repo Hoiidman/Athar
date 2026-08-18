@@ -23,6 +23,7 @@ function messageForError(error: unknown) {
 
 interface JoinFamilyCircleScreenProps {
   user: User;
+  initialCode?: string | null;
   onJoined?: (circleId: string) => void;
   onSwitchToCreate?: () => void;
   onSkip?: () => void;
@@ -30,11 +31,12 @@ interface JoinFamilyCircleScreenProps {
 
 export function JoinFamilyCircleScreen({
   user,
+  initialCode,
   onJoined,
   onSwitchToCreate,
   onSkip,
 }: JoinFamilyCircleScreenProps) {
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(initialCode ?? '');
   const [codeError, setCodeError] = useState<string>();
   const [formError, setFormError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
