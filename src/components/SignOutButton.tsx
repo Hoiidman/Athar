@@ -21,7 +21,7 @@ export function SignOutButton() {
 
   return (
     <View style={styles.container}>
-      <Button label="Sign out" variant="quiet" onPress={handlePress} loading={pending} />
+      <Button label="Sign out" variant="destructive" onPress={handlePress} loading={pending} />
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">
           {error}
@@ -33,7 +33,7 @@ export function SignOutButton() {
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'center',
+    alignSelf: 'stretch',
     gap: spacing.xs,
   },
   error: {
