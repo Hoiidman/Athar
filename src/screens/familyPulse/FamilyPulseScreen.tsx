@@ -34,7 +34,7 @@ export function FamilyPulseScreen({ user }: { user: User }) {
   const circleId = state.status === 'ready' ? state.circleId : null;
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, headerBackButtonDisplayMode: 'minimal' }}>
       <Stack.Screen name="FamilyPulseHome">
         {({ navigation }) => (
           <FamilyCircleHubScreen
@@ -54,7 +54,10 @@ export function FamilyPulseScreen({ user }: { user: User }) {
           />
         )}
       </Stack.Screen>
-      <Stack.Screen name="FamilyCircleMembers" options={{ headerShown: true, title: 'Your circle' }}>
+      <Stack.Screen
+        name="FamilyCircleMembers"
+        options={{ headerShown: true, title: 'Your circle' }}
+      >
         {({ navigation }) => (
           <FamilyCircleMembersScreen
             key={memberRevision}
@@ -80,10 +83,7 @@ export function FamilyPulseScreen({ user }: { user: User }) {
       <Stack.Screen name="FamilyCircleInvite" options={{ headerShown: true, title: 'Invite' }}>
         {() => <InviteScreen circleId={circleId} user={user} />}
       </Stack.Screen>
-      <Stack.Screen
-        name="FamilyCircleSettings"
-        options={{ headerShown: true, title: 'Settings' }}
-      >
+      <Stack.Screen name="FamilyCircleSettings" options={{ headerShown: true, title: 'Settings' }}>
         {({ navigation }) => (
           <FamilyCircleSettingsScreen
             circleId={circleId}
