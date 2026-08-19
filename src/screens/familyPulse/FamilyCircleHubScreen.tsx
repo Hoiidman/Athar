@@ -176,13 +176,14 @@ export function FamilyCircleHubScreen({
   }, [overview.status, onCircleLost]);
 
   function pullToRefresh() {
-    onRetryMembership();
+    if (state.status !== 'ready') onRetryMembership();
     refresh();
   }
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView
+        testID="family-pulse"
         contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl

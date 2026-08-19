@@ -1,6 +1,6 @@
 import { NavigationContainer } from '@react-navigation/native';
 import type { User } from 'firebase/auth';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { getFamilyCircle, listFamilyCircleMembers } from '../../../services/familyCircles';
 import { getFamilyCircleId } from '../../../services/users';
 import { FamilyPulseScreen } from '../FamilyPulseScreen';
@@ -77,6 +77,33 @@ describe('FamilyPulseScreen', () => {
     expect(getByText('The Mohameds')).toBeTruthy();
     expect(queryByRole('button', { name: 'Create a circle, or join with a code' })).toBeFalsy();
     expect(queryByRole('button', { name: 'Add an email so you never lose your memories' })).toBeFalsy();
+  });
+
+  it('reloads only the circle when the loaded page is pulled down', async () => {
+    mockGetFamilyCircleId.mockResolvedValue('circle-9');
+
+    const { getByTestId, getByRole } = await renderScreen();
+
+    await waitFor(() => expect(getByRole('button', { name: 'Members, 2 members' })).toBeTruthy());
+    expect(mockGetFamilyCircleId).toHaveBeenCalledTimes(1);
+
+    await act(async () => getByTestId('family-pulse').props.refreshControl.props.onRefresh());
+
+    await waitFor(() => expect(mockGetFamilyCircle).toHaveBeenCalledTimes(2));
+    expect(mockGetFamilyCircleId).toHaveBeenCalledTimes(1);
+    expect(getByRole('button', { name: 'Members, 2 members' })).toBeTruthy();
+  });
+
+  it('retries the membership read when pulled down after it failed', async () => {
+    mockGetFamilyCircleId.mockRejectedValueOnce(new Error('offline')).mockResolvedValue('circle-9');
+
+    const { getByTestId, getByRole } = await renderScreen();
+
+    await waitFor(() => expect(getByRole('button', { name: 'Try again' })).toBeTruthy());
+
+    await act(async () => getByTestId('family-pulse').props.refreshControl.props.onRefresh());
+
+    await waitFor(() => expect(getByRole('button', { name: 'Members, 2 members' })).toBeTruthy());
   });
 
   it('offers a retry rather than the circle when it cannot be read', async () => {
