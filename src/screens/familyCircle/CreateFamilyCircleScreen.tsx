@@ -2,7 +2,7 @@ import type { User } from 'firebase/auth';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
-import { InviteCodeCard } from '../../components/InviteCodeCard';
+import { InviteShare } from '../../components/InviteShare';
 import { TextInput } from '../../components/TextInput';
 import {
   FamilyCircleError,
@@ -63,16 +63,16 @@ export function CreateFamilyCircleScreen({
 
   if (created) {
     return (
-      <View style={[styles.flex, styles.centred]}>
+      <ScrollView style={styles.flex} contentContainerStyle={styles.created}>
         <Text style={styles.title}>{name.trim()}</Text>
         <Text style={styles.subtitle}>Share this code with your family so they can join.</Text>
-        <InviteCodeCard code={created.inviteCode} />
+        <InviteShare circleName={name.trim()} code={created.inviteCode} />
         {onContinue ? (
           <View style={styles.continue}>
             <Button label="Continue" onPress={() => onContinue(created.id)} />
           </View>
         ) : null}
-      </View>
+      </ScrollView>
     );
   }
 
@@ -142,10 +142,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  centred: {
+  created: {
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.lg,
     gap: spacing.sm,
   },
   content: {
