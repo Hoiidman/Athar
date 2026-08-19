@@ -1,30 +1,16 @@
 import type { User } from 'firebase/auth';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
-import * as Linking from 'expo-linking';
-import QRCode from 'react-native-qrcode-svg';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
-import { InviteCodeCard } from '../../components/InviteCodeCard';
+import { InviteShare } from '../../components/InviteShare';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
 import { rotateInviteCode } from '../../services/familyCircles';
-import { cardCornerRadius, cardShadow, colors, spacing, typography } from '../../theme';
+import { colors, spacing, typography } from '../../theme';
 
 interface InviteScreenProps {
   circleId: string | null;
   user: User;
-}
-
-export function inviteLink(code: string) {
-  return Linking.createURL(`join/${code}`);
-}
-
-function inviteMessage(circleName: string, code: string) {
-  return [
-    `Join our family circle "${circleName}" on Athar.`,
-    inviteLink(code),
-    `If that link does nothing, open Athar, choose Join a circle, and enter the code ${code}.`,
-  ].join('\n\n');
 }
 
 export function InviteScreen({ circleId, user }: InviteScreenProps) {
@@ -81,14 +67,6 @@ export function InviteScreen({ circleId, user }: InviteScreenProps) {
     );
   }
 
-  async function share() {
-    try {
-      await Share.share({ message: inviteMessage(name, inviteCode) });
-    } catch {
-      // The sheet was dismissed or unavailable; the code on screen still works.
-    }
-  }
-
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -98,16 +76,7 @@ export function InviteScreen({ circleId, user }: InviteScreenProps) {
         </Text>
       </View>
 
-      <InviteCodeCard code={inviteCode} />
-
-      <View style={styles.qr} accessibilityLabel="Invite code as a scannable code">
-        {/* Fixed black on white rather than theme colours — scanners need the
-            contrast, and it must not follow the palette into dark mode. */}
-        <QRCode value={inviteCode} size={180} color="#000000" backgroundColor="#FFFFFF" />
-        <Text style={styles.qrHint}>Or let them scan this while you are together.</Text>
-      </View>
-
-      <Button label="Share invite" onPress={share} />
+      <InviteShare circleName={name} code={inviteCode} />
 
       <Text style={styles.footnote}>
         They will need the Athar app, then Join a circle on the welcome screen.
@@ -160,19 +129,6 @@ const styles = StyleSheet.create({
   hint: {
     ...typography.body,
     color: colors.textSecondary,
-  },
-  qr: {
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: '#FFFFFF',
-    borderRadius: cardCornerRadius,
-    paddingVertical: spacing.md,
-    ...cardShadow,
-  },
-  qrHint: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    textAlign: 'center',
   },
   footnote: {
     ...typography.caption,
