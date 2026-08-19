@@ -100,7 +100,12 @@ function LeaveSection({ circle, user, onLeft }: LeaveSectionProps) {
         Leaving takes you out of {circle.name}. Nothing you shared is deleted, but you will not be
         able to see it again unless you rejoin.
       </Text>
-      <Button label="Leave circle" variant="destructive" onPress={confirmLeave} loading={leaving} />
+      <Button
+        label="Leave circle"
+        variant="destructiveOutline"
+        onPress={confirmLeave}
+        loading={leaving}
+      />
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">
           {error}

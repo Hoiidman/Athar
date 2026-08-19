@@ -8,7 +8,8 @@ import {
   typography,
 } from '../theme';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'destructive' | 'quiet';
+export type ButtonVariant =
+  'primary' | 'secondary' | 'destructive' | 'destructiveOutline' | 'quiet';
 
 interface ButtonProps {
   label: string;
@@ -34,9 +35,11 @@ export function Button({
   const labelColor =
     variant === 'secondary'
       ? colors.primary
-      : variant === 'quiet'
-        ? colors.textSecondary
-        : colors.textOnAccent;
+      : variant === 'destructiveOutline'
+        ? colors.error
+        : variant === 'quiet'
+          ? colors.textSecondary
+          : colors.textOnAccent;
 
   return (
     <Pressable
@@ -86,6 +89,11 @@ const styles = StyleSheet.create({
   },
   destructive: {
     backgroundColor: colors.error,
+  },
+  destructiveOutline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.error,
   },
   quiet: {
     backgroundColor: 'transparent',
