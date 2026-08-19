@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 're
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
+import { Select } from '../../components/Select';
 import { TextInput } from '../../components/TextInput';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
 import {
@@ -80,6 +81,29 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
+const OTHER = 'other';
+
+const RELATIONSHIPS = [
+  'Dad',
+  'Mum',
+  'Son',
+  'Daughter',
+  'Brother',
+  'Sister',
+  'Grandpa',
+  'Grandma',
+  'Uncle',
+  'Aunt',
+  'Cousin',
+].map((name) => ({ value: name, label: name }));
+
+const RELATIONSHIP_CHOICES = [...RELATIONSHIPS, { value: OTHER, label: 'Other' }];
+
+function choiceFor(current: string | null) {
+  if (!current) return null;
+  return RELATIONSHIPS.some((option) => option.value === current) ? current : OTHER;
+}
+
 interface RelationshipFieldProps {
   circleId: string;
   userId: string;
@@ -96,7 +120,8 @@ function RelationshipField({
   onSaved,
 }: RelationshipFieldProps) {
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(current ?? '');
+  const [choice, setChoice] = useState(() => choiceFor(current));
+  const [custom, setCustom] = useState(current ?? '');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -111,7 +136,8 @@ function RelationshipField({
               label={current ? 'Change' : 'Add'}
               variant="secondary"
               onPress={() => {
-                setValue(current ?? '');
+                setChoice(choiceFor(current));
+                setCustom(current ?? '');
                 setError(undefined);
                 setEditing(true);
               }}
@@ -122,6 +148,8 @@ function RelationshipField({
       </View>
     );
   }
+
+  const value = choice === OTHER ? custom.trim() : (choice ?? '');
 
   async function save() {
     setError(undefined);
@@ -139,18 +167,32 @@ function RelationshipField({
 
   return (
     <View style={styles.editor}>
-      <TextInput
+      <Select
         label="Relationship"
-        value={value}
-        onChangeText={setValue}
-        error={error}
-        helperText="How this person is related — Dad, Grandma, Sister."
-        maxLength={MAX_RELATIONSHIP_LENGTH}
-        autoCapitalize="words"
+        value={choice}
+        options={RELATIONSHIP_CHOICES}
+        onSelect={setChoice}
+        placeholder="Not set"
+        sheetTitle="How are they related?"
       />
+      {choice === OTHER ? (
+        <TextInput
+          label="Other relationship"
+          value={custom}
+          onChangeText={setCustom}
+          helperText="Whatever your family calls them — Khalo, Step-dad, Godmother."
+          maxLength={MAX_RELATIONSHIP_LENGTH}
+          autoCapitalize="words"
+        />
+      ) : null}
+      {error ? (
+        <Text style={styles.error} accessibilityRole="alert">
+          {error}
+        </Text>
+      ) : null}
       <View style={styles.editorActions}>
         <Button label="Cancel" variant="secondary" onPress={() => setEditing(false)} />
-        <Button label="Save" onPress={save} loading={pending} />
+        <Button label="Save" onPress={save} disabled={!value} loading={pending} />
       </View>
     </View>
   );

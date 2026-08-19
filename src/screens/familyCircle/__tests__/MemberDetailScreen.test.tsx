@@ -56,7 +56,12 @@ beforeEach(() => {
 describe('MemberDetailScreen', () => {
   it('shows the member and marks the row that is you', async () => {
     const { findByText, getByText } = await render(
-      <MemberDetailScreen circleId="circle-9" userId="user-1" currentUid="user-1" onRemoved={onRemoved} />,
+      <MemberDetailScreen
+        circleId="circle-9"
+        userId="user-1"
+        currentUid="user-1"
+        onRemoved={onRemoved}
+      />,
     );
 
     expect(await findByText('Layla')).toBeTruthy();
@@ -66,7 +71,12 @@ describe('MemberDetailScreen', () => {
 
   it('says so when the member is no longer in the circle', async () => {
     const { findByText, queryByText } = await render(
-      <MemberDetailScreen circleId="circle-9" userId="user-gone" currentUid="user-1" onRemoved={onRemoved} />,
+      <MemberDetailScreen
+        circleId="circle-9"
+        userId="user-gone"
+        currentUid="user-1"
+        onRemoved={onRemoved}
+      />,
     );
 
     expect(await findByText('No longer a member')).toBeTruthy();
@@ -75,11 +85,17 @@ describe('MemberDetailScreen', () => {
 
   it('lets the family owner label another member', async () => {
     const { findByRole, getByLabelText, getByRole } = await render(
-      <MemberDetailScreen circleId="circle-9" userId="user-2" currentUid="user-1" onRemoved={onRemoved} />,
+      <MemberDetailScreen
+        circleId="circle-9"
+        userId="user-2"
+        currentUid="user-1"
+        onRemoved={onRemoved}
+      />,
     );
 
     await fireEvent.press(await findByRole('button', { name: 'Add relationship' }));
-    await fireEvent.changeText(getByLabelText('Relationship'), 'Brother');
+    await fireEvent.press(getByLabelText('Relationship'));
+    await fireEvent.press(getByRole('button', { name: 'Brother' }));
     await fireEvent.press(getByRole('button', { name: 'Save' }));
 
     await waitFor(() =>
@@ -87,9 +103,35 @@ describe('MemberDetailScreen', () => {
     );
   });
 
+  it('takes a relationship the list does not cover', async () => {
+    const { findByRole, getByLabelText, getByRole } = await render(
+      <MemberDetailScreen
+        circleId="circle-9"
+        userId="user-2"
+        currentUid="user-1"
+        onRemoved={onRemoved}
+      />,
+    );
+
+    await fireEvent.press(await findByRole('button', { name: 'Add relationship' }));
+    await fireEvent.press(getByLabelText('Relationship'));
+    await fireEvent.press(getByRole('button', { name: 'Other' }));
+    await fireEvent.changeText(getByLabelText('Other relationship'), 'Khalo');
+    await fireEvent.press(getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mockSetRelationship).toHaveBeenCalledWith('circle-9', 'user-2', 'Khalo'),
+    );
+  });
+
   it('does not offer an ordinary member the label of someone else', async () => {
     const { findByText, queryByRole } = await render(
-      <MemberDetailScreen circleId="circle-9" userId="user-1" currentUid="user-2" onRemoved={onRemoved} />,
+      <MemberDetailScreen
+        circleId="circle-9"
+        userId="user-1"
+        currentUid="user-2"
+        onRemoved={onRemoved}
+      />,
     );
 
     expect(await findByText('Layla')).toBeTruthy();
