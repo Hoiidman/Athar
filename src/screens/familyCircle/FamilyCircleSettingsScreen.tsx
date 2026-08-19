@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
-import { SignOutButton } from '../../components/SignOutButton';
 import { TextInput } from '../../components/TextInput';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
 import {
@@ -177,11 +176,6 @@ export function FamilyCircleSettingsScreen(props: FamilyCircleSettingsScreenProp
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <CircleSettings {...props} />
-
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Account</Text>
-        <SignOutButton />
-      </View>
     </ScrollView>
   );
 }

@@ -57,6 +57,7 @@ describe('FamilyPulseScreen', () => {
 
     expect(getByText('Start a family circle')).toBeTruthy();
     expect(queryByRole('button', { name: 'Skip for now' })).toBeFalsy();
+    expect(queryByRole('button', { name: 'Family Settings' })).toBeFalsy();
   });
 
   it('offers a guest a way to save their account', async () => {
@@ -75,6 +76,8 @@ describe('FamilyPulseScreen', () => {
 
     await waitFor(() => expect(getByRole('button', { name: 'Members, 2 members' })).toBeTruthy());
     expect(getByText('The Mohameds')).toBeTruthy();
+    expect(getByRole('button', { name: 'Family Settings' })).toBeTruthy();
+    expect(getByRole('button', { name: 'Sign out' })).toBeTruthy();
     expect(queryByRole('button', { name: 'Create a circle, or join with a code' })).toBeFalsy();
     expect(queryByRole('button', { name: 'Add an email so you never lose your memories' })).toBeFalsy();
   });

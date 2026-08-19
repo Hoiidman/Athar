@@ -83,7 +83,10 @@ export function FamilyPulseScreen({ user }: { user: User }) {
       <Stack.Screen name="FamilyCircleInvite" options={{ headerShown: true, title: 'Invite' }}>
         {() => <InviteScreen circleId={circleId} user={user} />}
       </Stack.Screen>
-      <Stack.Screen name="FamilyCircleSettings" options={{ headerShown: true, title: 'Settings' }}>
+      <Stack.Screen
+        name="FamilyCircleSettings"
+        options={{ headerShown: true, title: 'Family Settings' }}
+      >
         {({ navigation }) => (
           <FamilyCircleSettingsScreen
             circleId={circleId}

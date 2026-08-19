@@ -107,13 +107,13 @@ describe('FamilyCircleSettingsScreen', () => {
     await waitFor(() => expect(getByText(/cannot leave it/)).toBeTruthy());
     expect(queryByRole('button', { name: 'Leave circle' })).toBeFalsy();
   });
-  it('still offers sign out when there is no circle to configure', async () => {
-    const { getByRole, queryByLabelText } = await render(
-      <FamilyCircleSettingsScreen circleId={null} user={member} onLeft={onLeft} />,
+
+  it('leaves signing out to the family page', async () => {
+    const { getByText, queryByRole } = await render(
+      <FamilyCircleSettingsScreen circleId="circle-9" user={member} onLeft={onLeft} />,
     );
 
-    expect(getByRole('button', { name: 'Sign out' })).toBeTruthy();
-    expect(queryByLabelText('Circle name')).toBeFalsy();
-    expect(mockGetFamilyCircle).not.toHaveBeenCalled();
+    await waitFor(() => expect(getByText('Our family')).toBeTruthy());
+    expect(queryByRole('button', { name: 'Sign out' })).toBeFalsy();
   });
 });

@@ -14,6 +14,7 @@ import { Avatar } from '../../components/Avatar';
 import { AvatarStack } from '../../components/AvatarStack';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
+import { SignOutButton } from '../../components/SignOutButton';
 import {
   useFamilyCircleOverview,
   type FamilyCircleOverviewState,
@@ -220,12 +221,15 @@ export function FamilyCircleHubScreen({
               onPress={onUpgradeAccount}
             />
           ) : null}
-          <ActionRow
-            icon="settings"
-            title="Settings"
-            subtitle="Your circle, and signing out"
-            onPress={onOpenSettings}
-          />
+          {circleId ? (
+            <ActionRow
+              icon="settings"
+              title="Family Settings"
+              subtitle="Your circle's name, and leaving"
+              onPress={onOpenSettings}
+            />
+          ) : null}
+          <SignOutButton />
         </Section>
       </ScrollView>
     </SafeAreaView>
