@@ -7,6 +7,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -17,10 +18,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector, GestureType } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Crypto from 'expo-crypto';
+import * as MediaLibrary from 'expo-media-library';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { captureRef } from 'react-native-view-shot';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootStackNavigator';
 import { CaptureItem, useCaptureSessionStore } from '../../store/captureSessionStore';
+import { useCaptureDestinationStore } from '../../store/captureDestinationStore';
+import { MY_SPACE_GROUP_ID } from '../../types';
+import { AlbumPicker } from '../capture/AlbumPicker';
 import { clampOverlayScale, DraggableItem, DragPosition } from './DraggableItem';
 import { DrawCanvas, Stroke } from './DrawCanvas';
 import { FILTERS, FilterId, INK_COLORS, STICKERS, TOOLS, ToolId } from './editorOptions';
@@ -50,29 +56,18 @@ interface MediaEdits {
 
 const EMPTY_EDITS: MediaEdits = { filter: 'none', texts: [], stickers: [], strokes: [] };
 
-function isEdited(edits: MediaEdits) {
-  return (
-    edits.filter !== 'none' ||
-    edits.texts.length > 0 ||
-    edits.stickers.length > 0 ||
-    edits.strokes.length > 0
-  );
-}
-
-const AVAILABLE_TOOLS: ToolId[] = ['text', 'filters', 'sounds', 'stickers', 'draw'];
-
-// A full screen modal does not always report insets, and without a floor the
-// buttons land under the status bar where they cannot be tapped.
-const MIN_TOP_INSET = 16;
-const MIN_BOTTOM_INSET = 12;
-
-const SWIPE_CHANGE_DISTANCE = 60;
 const SWIPE_CLOSE_DISTANCE = 130;
+const SWIPE_CHANGE_DISTANCE = 60;
 
 // How far the stage can travel downwards, and how much of the drag past the
 // close threshold actually lands, so the screen never leaves a gap behind it.
 const MAX_DOWN_DRAG = 200;
 const DRAG_RESISTANCE = 0.25;
+
+// A full screen modal does not always report insets, and without a floor the
+// buttons land under the status bar where they cannot be tapped.
+const MIN_TOP_INSET = 16;
+const MIN_BOTTOM_INSET = 12;
 
 // Anything dropped below this line while dragging gets removed.
 const DELETE_ZONE_HEIGHT = 150;
@@ -85,6 +80,15 @@ function dampDown(value: number) {
   if (value <= SWIPE_CLOSE_DISTANCE) return value;
   const past = (value - SWIPE_CLOSE_DISTANCE) * DRAG_RESISTANCE;
   return Math.min(SWIPE_CLOSE_DISTANCE + past, MAX_DOWN_DRAG);
+}
+
+function isEdited(edits: MediaEdits) {
+  return (
+    edits.filter !== 'none' ||
+    edits.texts.length > 0 ||
+    edits.stickers.length > 0 ||
+    edits.strokes.length > 0
+  );
 }
 
 /* ------------------------------------------------------------------ *
@@ -142,18 +146,18 @@ function usePreviewEdits(selectedId: string | undefined) {
 }
 
 /* ------------------------------------------------------------------ *
- * Pieces
+ * Stage pieces
  * ------------------------------------------------------------------ */
 
 /**
- * Neighbours only exist to be swiped onto, so a video keeps a poster rather
- * than spinning up a second player alongside the one on screen.
+ * Neighbours only exist to be swiped onto, so they skip the editing layers and
+ * a video keeps a poster rather than spinning up a second player.
  */
 function StaticMedia({ item }: { item: CaptureItem }) {
   if (item.kind === 'video') {
     return (
-      <View style={[StyleSheet.absoluteFill, styles.poster]}>
-        <Ionicons name="play" size={44} color={colors.surface} />
+      <View style={[StyleSheet.absoluteFill, styles.neighbourVideo]}>
+        <Ionicons name="play" size={40} color={colors.surface} />
       </View>
     );
   }
@@ -162,7 +166,6 @@ function StaticMedia({ item }: { item: CaptureItem }) {
   );
 }
 
-/** Sits behind the stage and is uncovered as the preview is dragged down. */
 function DiscardLayer({ visible, drag }: { visible: boolean; drag: Animated.Value }) {
   const progress = drag.interpolate({
     inputRange: [0, SWIPE_CLOSE_DISTANCE],
@@ -196,6 +199,10 @@ function DeleteZone({ active }: { active: boolean }) {
     </View>
   );
 }
+
+/* ------------------------------------------------------------------ *
+ * Chrome
+ * ------------------------------------------------------------------ */
 
 interface TopBarProps {
   topInset: number;
@@ -259,7 +266,7 @@ function TopBar({
 function ToolRail({ onSelect }: { onSelect: (tool: ToolId) => void }) {
   return (
     <View style={styles.toolRail}>
-      {TOOLS.filter((tool) => AVAILABLE_TOOLS.includes(tool.id)).map((tool) => (
+      {TOOLS.map((tool) => (
         <Pressable key={tool.id} style={styles.tool} onPress={() => onSelect(tool.id)}>
           <View style={styles.toolIcon}>
             <Ionicons name={tool.icon} size={22} color={colors.surface} />
@@ -270,6 +277,79 @@ function ToolRail({ onSelect }: { onSelect: (tool: ToolId) => void }) {
     </View>
   );
 }
+
+interface CarouselProps {
+  items: CaptureItem[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}
+
+function Carousel({ items, selectedId, onSelect }: CarouselProps) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.strip}
+    >
+      {items.map((item) => (
+        <Pressable key={item.id} onPress={() => onSelect(item.id)}>
+          {item.kind === 'photo' ? (
+            <Image
+              source={{ uri: item.uri }}
+              style={[styles.frame, item.id === selectedId && styles.frameActive]}
+            />
+          ) : (
+            <View
+              style={[
+                styles.frame,
+                styles.frameVideo,
+                item.id === selectedId && styles.frameActive,
+              ]}
+            >
+              <Ionicons name="play" size={18} color={colors.surface} />
+            </View>
+          )}
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
+}
+
+interface ActionsProps {
+  albumLabel: string;
+  busy: boolean;
+  onShare: () => void;
+  onSave: () => void;
+  /** Long pressing save is how the destination space gets changed. */
+  onPickAlbum: () => void;
+}
+
+function Actions({ albumLabel, busy, onShare, onSave, onPickAlbum }: ActionsProps) {
+  return (
+    <View style={styles.actions}>
+      <Pressable style={[styles.action, styles.actionSecondary]} onPress={onShare} disabled={busy}>
+        <Ionicons name="share-outline" size={20} color={colors.surface} />
+        <Text style={styles.actionText}>Share</Text>
+      </Pressable>
+
+      <Pressable
+        style={[styles.action, styles.actionPrimary]}
+        onPress={onSave}
+        onLongPress={onPickAlbum}
+        disabled={busy}
+      >
+        <Ionicons name="checkmark" size={20} color={colors.textOnAccent} />
+        <Text style={[styles.actionText, styles.actionTextPrimary]} numberOfLines={1}>
+          Save to {albumLabel}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Editor panels
+ * ------------------------------------------------------------------ */
 
 function InkSwatches({ value, onChange }: { value: string; onChange: (color: string) => void }) {
   return (
@@ -397,43 +477,6 @@ function SoundsPanel() {
   );
 }
 
-interface CarouselProps {
-  items: CaptureItem[];
-  selectedId: string;
-  onSelect: (id: string) => void;
-}
-
-function Carousel({ items, selectedId, onSelect }: CarouselProps) {
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.strip}
-    >
-      {items.map((item) => (
-        <Pressable key={item.id} onPress={() => onSelect(item.id)}>
-          {item.kind === 'photo' ? (
-            <Image
-              source={{ uri: item.uri }}
-              style={[styles.frame, item.id === selectedId && styles.frameActive]}
-            />
-          ) : (
-            <View
-              style={[
-                styles.frame,
-                styles.frameVideo,
-                item.id === selectedId && styles.frameActive,
-              ]}
-            >
-              <Ionicons name="play" size={18} color={colors.surface} />
-            </View>
-          )}
-        </Pressable>
-      ))}
-    </ScrollView>
-  );
-}
-
 /* ------------------------------------------------------------------ *
  * Screen
  * ------------------------------------------------------------------ */
@@ -447,6 +490,7 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
 
   const items = useCaptureSessionStore((state) => state.items);
   const removeItem = useCaptureSessionStore((state) => state.removeItem);
+  const { destinationId } = useCaptureDestinationStore();
 
   // Newest first, so the shot you just took reads as 1 of 3.
   const ordered = useMemo(() => items.filter((item) => item.kind !== 'audio').reverse(), [items]);
@@ -455,8 +499,10 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   const [activeTool, setActiveTool] = useState<ToolId | null>(null);
   const [draft, setDraft] = useState('');
   const [inkColor, setInkColor] = useState<string>(INK_COLORS[0] ?? colors.surface);
+  const [albumPickerVisible, setAlbumPickerVisible] = useState(false);
   const [draggingOverlay, setDraggingOverlay] = useState(false);
   const [overDelete, setOverDelete] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const index = Math.max(
     0,
@@ -468,6 +514,7 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   const edited = isEdited(current);
   const editMode = activeTool !== null || edited;
 
+  const stageRef = useRef<View>(null);
   const swipeRef = useRef<GestureType | undefined>(undefined);
   const pinchRef = useRef<GestureType | undefined>(undefined);
   const dragX = useRef(new Animated.Value(0)).current;
@@ -485,8 +532,6 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
     return overlayScales.current[id];
   }
 
-  // Passing null for a photo keeps the hook order stable without loading
-  // anything the player does not need.
   const player = useVideoPlayer(selected?.kind === 'video' ? selected.uri : null, (instance) => {
     instance.loop = true;
     instance.play();
@@ -540,7 +585,6 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
     () =>
       Gesture.Pan()
         .withRef(swipeRef)
-        // Strokes would otherwise read as swipes across the stage.
         .enabled(activeTool !== 'draw')
         .maxPointers(1)
         .minDistance(15)
@@ -568,7 +612,6 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
             else springHome();
             return;
           }
-
           if (editMode) {
             springHome();
             return;
@@ -578,7 +621,7 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
           else springHome();
         }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [index, ordered, width, editMode, edited, activeTool],
+    [editMode, index, ordered, width, edited, activeTool],
   );
 
   const overlayPinch = useMemo(
@@ -636,6 +679,43 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
     ]);
   }
 
+  async function flatten() {
+    // view-shot cannot pull a frame out of a video, so its own file is the
+    // only sensible thing to hand on.
+    if (selected?.kind === 'video') return selected.uri;
+    return captureRef(stageRef, { format: 'jpg', quality: 0.95 });
+  }
+
+  async function handleSave() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const permission = await MediaLibrary.requestPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission needed', 'Athar needs photo library access to save this.');
+        return;
+      }
+      await MediaLibrary.saveToLibraryAsync(await flatten());
+      Alert.alert('Saved', 'Added to your photo library.');
+    } catch {
+      Alert.alert('Could not save', 'Something went wrong writing the file.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleShare() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await Share.share({ url: await flatten(), message: 'From Athar' });
+    } catch {
+      Alert.alert('Could not share', 'Something went wrong preparing the file.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function commitText() {
     const text = draft.trim();
     if (text) {
@@ -669,6 +749,8 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   const filter = FILTERS.find((option) => option.id === current.filter) ?? FILTERS[0];
   const dismissable =
     activeTool === 'filters' || activeTool === 'sounds' || activeTool === 'stickers';
+  const albumLabel = destinationId === MY_SPACE_GROUP_ID ? 'My Space' : destinationId;
+  const showActions = edited && activeTool === null;
 
   return (
     <View style={styles.container}>
@@ -694,7 +776,7 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
             </View>
           )}
 
-          <View style={styles.stage}>
+          <View ref={stageRef} style={styles.stage} collapsable={false}>
             {selected.kind === 'video' ? (
               <VideoView
                 player={player}
@@ -808,19 +890,19 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
           />
         )}
 
-        {activeTool === 'filters' && (
-          <FilterPanel
-            previewUri={selected.kind === 'photo' ? selected.uri : undefined}
-            active={current.filter}
-            onSelect={(next) => update({ filter: next })}
-          />
-        )}
-
         {activeTool === 'draw' && (
           <DrawPanel
             inkColor={inkColor}
             onChangeColor={setInkColor}
             onDone={() => setActiveTool(null)}
+          />
+        )}
+
+        {activeTool === 'filters' && (
+          <FilterPanel
+            previewUri={selected.kind === 'photo' ? selected.uri : undefined}
+            active={current.filter}
+            onSelect={(next) => update({ filter: next })}
           />
         )}
 
@@ -830,10 +912,23 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
 
         {activeTool === null && <ToolRail onSelect={setActiveTool} />}
 
-        {activeTool === null && ordered.length > 1 && (
-          <Carousel items={ordered} selectedId={selected.id} onSelect={setSelectedId} />
+        {showActions ? (
+          <Actions
+            albumLabel={albumLabel}
+            busy={busy}
+            onShare={handleShare}
+            onSave={handleSave}
+            onPickAlbum={() => setAlbumPickerVisible(true)}
+          />
+        ) : (
+          activeTool === null &&
+          ordered.length > 1 && (
+            <Carousel items={ordered} selectedId={selected.id} onSelect={setSelectedId} />
+          )
         )}
       </View>
+
+      <AlbumPicker visible={albumPickerVisible} onClose={() => setAlbumPickerVisible(false)} />
     </View>
   );
 }
@@ -874,10 +969,31 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: '#000',
   },
-  poster: {
+  neighbourVideo: {
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#1A1A1A',
+  },
+  empty: {
+    flex: 1,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  emptyText: {
+    ...typography.body,
+    color: colors.surface,
+  },
+  emptyButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 8,
+  },
+  emptyButtonText: {
+    ...typography.label,
+    color: colors.textOnAccent,
   },
   topBar: {
     position: 'absolute',
@@ -890,17 +1006,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.sm,
   },
-  hidden: {
-    opacity: 0,
-  },
-  roundButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   counter: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
@@ -911,6 +1016,17 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.surface,
     fontVariant: ['tabular-nums'],
+  },
+  roundButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hidden: {
+    opacity: 0,
   },
   deleteZone: {
     position: 'absolute',
@@ -971,57 +1087,6 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.surface,
   },
-  panel: {
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
-  },
-  panelNote: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  input: {
-    ...typography.heading,
-    paddingHorizontal: spacing.md,
-  },
-  swatchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-  },
-  swatch: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  swatchActive: {
-    borderColor: colors.surface,
-  },
-  done: {
-    marginLeft: 'auto',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
-  },
-  doneText: {
-    ...typography.label,
-    color: colors.textOnAccent,
-  },
-  stickerGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-  },
-  stickerChoice: {
-    fontSize: 30,
-  },
   strip: {
     // Pinned so an RTL locale does not flip the running order.
     direction: 'ltr',
@@ -1063,6 +1128,85 @@ const styles = StyleSheet.create({
   tileWash: {
     ...StyleSheet.absoluteFillObject,
   },
+  panel: {
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+  },
+  panelNote: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  input: {
+    ...typography.heading,
+    paddingHorizontal: spacing.md,
+  },
+  swatchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+  },
+  swatch: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  swatchActive: {
+    borderColor: colors.surface,
+  },
+  done: {
+    marginLeft: 'auto',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+  },
+  doneText: {
+    ...typography.label,
+    color: colors.textOnAccent,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  action: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 54,
+    borderRadius: 27,
+  },
+  actionSecondary: {
+    paddingHorizontal: spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  actionPrimary: {
+    flex: 1,
+    backgroundColor: colors.primary,
+  },
+  actionText: {
+    ...typography.label,
+    color: colors.surface,
+  },
+  actionTextPrimary: {
+    color: colors.textOnAccent,
+  },
+  stickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  stickerChoice: {
+    fontSize: 30,
+  },
   overlayText: {
     ...typography.display,
     textShadowColor: 'rgba(0,0,0,0.6)',
@@ -1071,26 +1215,5 @@ const styles = StyleSheet.create({
   },
   overlaySticker: {
     fontSize: 56,
-  },
-  empty: {
-    flex: 1,
-    backgroundColor: '#000',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  emptyText: {
-    ...typography.body,
-    color: colors.surface,
-  },
-  emptyButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: 8,
-  },
-  emptyButtonText: {
-    ...typography.label,
-    color: colors.textOnAccent,
   },
 });
