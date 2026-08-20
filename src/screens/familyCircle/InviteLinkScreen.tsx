@@ -26,15 +26,10 @@ interface InviteLinkScreenProps {
   code: string;
   onJoined: () => void;
   onUseAccount: () => void;
-  onDismiss: () => void;
+  onSkip: () => void;
 }
 
-export function InviteLinkScreen({
-  code,
-  onJoined,
-  onUseAccount,
-  onDismiss,
-}: InviteLinkScreenProps) {
+export function InviteLinkScreen({ code, onJoined, onUseAccount, onSkip }: InviteLinkScreenProps) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -79,7 +74,7 @@ export function InviteLinkScreen({
         <View style={styles.action}>
           <Button label="Join as guest" onPress={join} loading={pending} />
           {error ? (
-            <Button label="Continue without joining" variant="secondary" onPress={onDismiss} />
+            <Button label="Continue without joining" variant="secondary" onPress={onSkip} />
           ) : (
             <Pressable
               onPress={onUseAccount}

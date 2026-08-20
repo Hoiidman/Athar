@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { User } from 'firebase/auth';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { Linking } from 'react-native';
 import App from '../App';
 import { useAuth } from '../src/hooks/useAuth';
 import { useEnsureUserDocument } from '../src/hooks/useEnsureUserDocument';
@@ -11,6 +12,7 @@ jest.mock('../src/hooks/useEnsureUserDocument', () => ({
   useEnsureUserDocument: jest.fn(() => ({ failed: false, retry: jest.fn() })),
 }));
 jest.mock('../src/services/users', () => ({ getFamilyCircleId: jest.fn() }));
+jest.mock('../src/services/auth', () => ({ signInAsGuest: jest.fn() }));
 jest.mock('../src/navigation/RootTabNavigator', () => {
   const { Text: RNText } = require('react-native');
   return { RootTabNavigator: () => <RNText>Capture screen</RNText> };
@@ -42,6 +44,7 @@ beforeEach(async () => {
   mockGetFamilyCircleId.mockReset();
   mockUseEnsureUserDocument.mockReturnValue({ failed: false, retry: jest.fn() });
   mockUseAuth.mockReturnValue({ user: { uid: 'user-1' } as User, initializing: false });
+  jest.spyOn(Linking, 'getInitialURL').mockResolvedValue(null);
 });
 
 describe('App routing on family circle membership', () => {
@@ -92,6 +95,16 @@ describe('App routing on family circle membership', () => {
 
     await fireEvent.press(getByRole('button', { name: 'Try again' }));
     expect(retry).toHaveBeenCalled();
+  });
+
+  it('takes an invite link past the sign-in screen', async () => {
+    mockUseAuth.mockReturnValue({ user: null, initializing: false });
+    jest.spyOn(Linking, 'getInitialURL').mockResolvedValue('athar://join/K7M2P9XR');
+
+    const { findByRole, queryByText } = await render(<App />);
+
+    expect(await findByRole('button', { name: 'Join as guest' })).toBeTruthy();
+    expect(queryByText('Sign in')).toBeFalsy();
   });
 
   it('offers a retry instead of onboarding when membership cannot be read', async () => {

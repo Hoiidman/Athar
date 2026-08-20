@@ -24,7 +24,7 @@ const mockJoin = joinFamilyCircle as jest.Mock;
 const guest = { uid: 'guest-1' } as User;
 const onJoined = jest.fn();
 const onUseAccount = jest.fn();
-const onDismiss = jest.fn();
+const onSkip = jest.fn();
 
 function renderScreen() {
   return render(
@@ -32,7 +32,7 @@ function renderScreen() {
       code="K7M2P9XR"
       onJoined={onJoined}
       onUseAccount={onUseAccount}
-      onDismiss={onDismiss}
+      onSkip={onSkip}
     />,
   );
 }
@@ -42,7 +42,7 @@ beforeEach(() => {
   mockJoin.mockReset().mockResolvedValue('circle-9');
   onJoined.mockReset();
   onUseAccount.mockReset();
-  onDismiss.mockReset();
+  onSkip.mockReset();
 });
 
 describe('InviteLinkScreen', () => {
@@ -71,7 +71,7 @@ describe('InviteLinkScreen', () => {
     expect(onJoined).not.toHaveBeenCalled();
 
     await fireEvent.press(getByRole('button', { name: 'Continue without joining' }));
-    expect(onDismiss).toHaveBeenCalled();
+    expect(onSkip).toHaveBeenCalled();
   });
 
   it('hands someone with an account back to signing in', async () => {
