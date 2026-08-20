@@ -57,28 +57,14 @@ describe('App routing on family circle membership', () => {
     expect(queryByText('Start a family circle')).toBeFalsy();
   });
 
-  it('sends someone with no circle to onboarding', async () => {
+  it('sends someone with no circle to onboarding, with no way past it', async () => {
     mockGetFamilyCircleId.mockResolvedValue(null);
 
-    const { getByText, queryByText } = await render(<App />);
+    const { getByText, queryByRole, queryByText } = await render(<App />);
 
     await waitFor(() => expect(getByText('Start a family circle')).toBeTruthy());
     expect(queryByText('Capture screen')).toBeFalsy();
-  });
-
-  it('lets someone skip onboarding into the app, and remembers the choice', async () => {
-    mockUseAuth.mockReturnValue({ user: { uid: 'user-skip' } as User, initializing: false });
-    mockGetFamilyCircleId.mockResolvedValue(null);
-
-    const { getByRole, getByText } = await render(<App />);
-    await waitFor(() => expect(getByText('Start a family circle')).toBeTruthy());
-
-    await fireEvent.press(getByRole('button', { name: 'Skip for now' }));
-
-    await waitFor(() => expect(getByText('Capture screen')).toBeTruthy());
-    await waitFor(async () =>
-      expect(await AsyncStorage.getItem('athar/circle-onboarding-skipped/user-skip')).toBe('true'),
-    );
+    expect(queryByRole('button', { name: 'Skip for now' })).toBeFalsy();
   });
 
   it('surfaces a failed account setup instead of silently continuing', async () => {

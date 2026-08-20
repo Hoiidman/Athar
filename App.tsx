@@ -10,7 +10,6 @@ import { Button } from './src/components/Button';
 import { FamilyCircleOnboardingScreen } from './src/screens/familyCircle/FamilyCircleOnboardingScreen';
 import { InviteLinkScreen } from './src/screens/familyCircle/InviteLinkScreen';
 import { useAuth } from './src/hooks/useAuth';
-import { useCircleOnboardingSkip } from './src/hooks/useCircleOnboardingSkip';
 import { useEnsureUserDocument } from './src/hooks/useEnsureUserDocument';
 import { useFamilyCircleMembership } from './src/hooks/useFamilyCircleMembership';
 import { useInviteLinkFlow } from './src/hooks/useInviteLinkFlow';
@@ -45,7 +44,6 @@ interface SignedInRoutesProps {
 function SignedInRoutes({ user, inviteCode, onInviteUsed }: SignedInRoutesProps) {
   const userDocument = useEnsureUserDocument(user);
   const { state, retry, adoptCircle } = useFamilyCircleMembership(user);
-  const onboardingSkip = useCircleOnboardingSkip(user.uid);
 
   if (userDocument.failed) {
     return (
@@ -56,7 +54,7 @@ function SignedInRoutes({ user, inviteCode, onInviteUsed }: SignedInRoutesProps)
     );
   }
 
-  if (state.status === 'loading' || onboardingSkip.loading) return <Splash />;
+  if (state.status === 'loading') return <Splash />;
 
   if (state.status === 'error') {
     return (
@@ -67,7 +65,7 @@ function SignedInRoutes({ user, inviteCode, onInviteUsed }: SignedInRoutesProps)
     );
   }
 
-  if (state.circleId || (onboardingSkip.skipped && !inviteCode)) {
+  if (state.circleId) {
     return <RootTabNavigator user={user} />;
   }
 
@@ -78,10 +76,6 @@ function SignedInRoutes({ user, inviteCode, onInviteUsed }: SignedInRoutesProps)
       onCircleReady={(circleId) => {
         onInviteUsed();
         adoptCircle(circleId);
-      }}
-      onSkip={() => {
-        onInviteUsed();
-        onboardingSkip.skip();
       }}
     />
   );

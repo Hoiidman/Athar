@@ -7,14 +7,12 @@ interface FamilyCircleOnboardingScreenProps {
   user: User;
   initialInviteCode?: string | null;
   onCircleReady: (circleId: string) => void;
-  onSkip?: () => void;
 }
 
 export function FamilyCircleOnboardingScreen({
   user,
   initialInviteCode,
   onCircleReady,
-  onSkip,
 }: FamilyCircleOnboardingScreenProps) {
   const [mode, setMode] = useState<'create' | 'join'>(initialInviteCode ? 'join' : 'create');
 
@@ -25,7 +23,6 @@ export function FamilyCircleOnboardingScreen({
         initialCode={initialInviteCode}
         onJoined={onCircleReady}
         onSwitchToCreate={() => setMode('create')}
-        onSkip={onSkip}
       />
     );
   }
@@ -35,7 +32,6 @@ export function FamilyCircleOnboardingScreen({
       user={user}
       onContinue={onCircleReady}
       onSwitchToJoin={() => setMode('join')}
-      onSkip={onSkip}
     />
   );
 }
