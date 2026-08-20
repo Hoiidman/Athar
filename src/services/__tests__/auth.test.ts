@@ -1,10 +1,19 @@
 import {
+  EmailAuthProvider,
   createUserWithEmailAndPassword,
+  linkWithCredential,
   signInAnonymously,
   signInWithEmailAndPassword,
   signOut,
+  type User,
 } from 'firebase/auth';
-import { signIn, signInAsGuest, signOut as signOutWrapper, signUp } from '../auth';
+import {
+  linkGuestAccount,
+  signIn,
+  signInAsGuest,
+  signOut as signOutWrapper,
+  signUp,
+} from '../auth';
 import { auth } from '../firebase';
 
 // Mock our own firebase.ts too, not just firebase/auth — otherwise
@@ -16,7 +25,9 @@ import { auth } from '../firebase';
 jest.mock('../firebase', () => ({ auth: { __mockAuth: true } }));
 
 jest.mock('firebase/auth', () => ({
+  EmailAuthProvider: { credential: jest.fn(() => ({ __credential: true })) },
   createUserWithEmailAndPassword: jest.fn(),
+  linkWithCredential: jest.fn(),
   signInWithEmailAndPassword: jest.fn(),
   signInAnonymously: jest.fn(),
   signOut: jest.fn(),
@@ -41,5 +52,14 @@ describe('auth service', () => {
   it('signOut calls the Firebase signOut', () => {
     signOutWrapper();
     expect(signOut).toHaveBeenCalledWith(auth);
+  });
+
+  it('linkGuestAccount links the credentials to the existing account', () => {
+    const guest = { uid: 'guest-1' } as User;
+
+    linkGuestAccount(guest, 'a@b.com', 'password123');
+
+    expect(EmailAuthProvider.credential).toHaveBeenCalledWith('a@b.com', 'password123');
+    expect(linkWithCredential).toHaveBeenCalledWith(guest, { __credential: true });
   });
 });

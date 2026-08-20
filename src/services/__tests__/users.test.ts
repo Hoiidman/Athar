@@ -1,6 +1,6 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
-import { ensureUserDocument } from '../users';
+import { ensureUserDocument, getFamilyCircleId } from '../users';
 
 jest.mock('../firebase', () => ({ firestore: { __mockFirestore: true } }));
 
@@ -83,7 +83,9 @@ describe('ensureUserDocument', () => {
     mockGetDoc.mockResolvedValue({ exists: () => false });
     mockSetDoc.mockResolvedValue(undefined);
 
-    await ensureUserDocument(fakeUser({ displayName: 'Layla', photoURL: 'https://example.com/p.jpg' }));
+    await ensureUserDocument(
+      fakeUser({ displayName: 'Layla', photoURL: 'https://example.com/p.jpg' }),
+    );
 
     expect(mockSetDoc).toHaveBeenCalledWith(
       { __mockDocRef: true },
@@ -95,5 +97,27 @@ describe('ensureUserDocument', () => {
         updatedAt: '__mockServerTimestamp',
       },
     );
+  });
+});
+
+describe('getFamilyCircleId', () => {
+  it('returns the id from the user document', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ familyCircleId: 'circle-1' }),
+    });
+
+    await expect(getFamilyCircleId('abc123')).resolves.toBe('circle-1');
+  });
+
+  it('returns null when the user has no circle, or no document at all', async () => {
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ familyCircleId: null }),
+    });
+    await expect(getFamilyCircleId('abc123')).resolves.toBeNull();
+
+    mockGetDoc.mockResolvedValueOnce({ exists: () => false });
+    await expect(getFamilyCircleId('abc123')).resolves.toBeNull();
   });
 });

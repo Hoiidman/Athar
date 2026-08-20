@@ -1,8 +1,8 @@
 import type { User } from 'firebase/auth';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { firestore } from './firebase';
 
-function defaultDisplayName(user: User): string {
+export function defaultDisplayName(user: User): string {
   if (user.displayName) return user.displayName;
   if (user.email) return user.email.split('@')[0] ?? 'Guest';
   return 'Guest';
@@ -20,4 +20,21 @@ export async function ensureUserDocument(user: User): Promise<void> {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function setUserDisplayName(uid: string, displayName: string): Promise<void> {
+  await updateDoc(doc(firestore, 'users', uid), { displayName, updatedAt: serverTimestamp() });
+}
+
+export async function clearOwnFamilyCircleId(uid: string): Promise<void> {
+  await updateDoc(doc(firestore, 'users', uid), {
+    familyCircleId: null,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function getFamilyCircleId(uid: string): Promise<string | null> {
+  const snapshot = await getDoc(doc(firestore, 'users', uid));
+  if (!snapshot.exists()) return null;
+  return (snapshot.data().familyCircleId as string | null) ?? null;
 }
