@@ -22,6 +22,9 @@ export interface FamilyCircleMember {
   // security rules can verify it maps to this circle (ADR-021).
   inviteCodeUsed: string | null;
   joinedAt: number;
+  // How this person is described within the family — "Dad", "Grandma".
+  // Absent on member documents written before the field existed.
+  relationship?: string | null;
 }
 
 /**

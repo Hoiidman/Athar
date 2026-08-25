@@ -1,3 +1,13 @@
+require('react-native-gesture-handler/jestSetup');
+
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
+
+jest.mock('react-native-safe-area-context', () =>
+  require('react-native-safe-area-context/jest/mock').default,
+);
+
 // Environment variables are read at module scope in src/services/firebase.ts,
 // so they need values before any test imports it.
 process.env.EXPO_PUBLIC_FIREBASE_API_KEY = 'test-api-key';

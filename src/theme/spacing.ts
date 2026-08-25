@@ -7,4 +7,7 @@ export const spacing = {
 } as const;
 
 export const minTapTarget = 44;
-export const cardCornerRadius = 12;
+// Two radii only, and the smaller one is always the nested one: controls and
+// badges sit inside cards, never the other way round.
+export const cardCornerRadius = 16;
+export const controlCornerRadius = 12;

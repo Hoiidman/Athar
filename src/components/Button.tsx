@@ -1,10 +1,19 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
-import { colors, minTapTarget, spacing, typography } from '../theme';
+import {
+  accentShadow,
+  colors,
+  controlCornerRadius,
+  minTapTarget,
+  spacing,
+  typography,
+} from '../theme';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'destructive';
+export type ButtonVariant =
+  'primary' | 'secondary' | 'destructive' | 'destructiveOutline' | 'quiet';
 
 interface ButtonProps {
   label: string;
+  hint?: string;
   onPress: () => void;
   variant?: ButtonVariant;
   disabled?: boolean;
@@ -15,6 +24,7 @@ interface ButtonProps {
 
 export function Button({
   label,
+  hint,
   onPress,
   variant = 'primary',
   disabled = false,
@@ -22,14 +32,21 @@ export function Button({
   accessibilityLabel,
 }: ButtonProps) {
   const interactive = !disabled && !loading;
-  const isOutline = variant === 'secondary';
+  const labelColor =
+    variant === 'secondary'
+      ? colors.primary
+      : variant === 'destructiveOutline'
+        ? colors.error
+        : variant === 'quiet'
+          ? colors.textSecondary
+          : colors.textOnAccent;
 
   return (
     <Pressable
       onPress={onPress}
       disabled={!interactive}
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityLabel={accessibilityLabel ?? (hint ? `${label}, ${hint}` : label)}
       accessibilityState={{ disabled: !interactive, busy: loading }}
       style={({ pressed }) => [
         styles.base,
@@ -41,11 +58,12 @@ export function Button({
       {loading ? (
         // Rendered at the same height as the label so the button doesn't
         // resize when it enters the loading state.
-        <ActivityIndicator size="small" color={isOutline ? colors.primary : colors.textOnAccent} />
+        <ActivityIndicator size="small" color={labelColor} />
       ) : (
-        <Text style={[styles.label, isOutline ? styles.labelOutline : styles.labelFilled]}>
-          {label}
-        </Text>
+        <>
+          <Text style={[styles.label, { color: labelColor }]}>{label}</Text>
+          {hint ? <Text style={[styles.hint, { color: labelColor }]}>{hint}</Text> : null}
+        </>
       )}
     </Pressable>
   );
@@ -56,12 +74,13 @@ const styles = StyleSheet.create({
     minHeight: minTapTarget,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    borderRadius: 12,
+    borderRadius: controlCornerRadius,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primary: {
     backgroundColor: colors.primary,
+    ...accentShadow,
   },
   secondary: {
     backgroundColor: 'transparent',
@@ -70,6 +89,14 @@ const styles = StyleSheet.create({
   },
   destructive: {
     backgroundColor: colors.error,
+  },
+  destructiveOutline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  quiet: {
+    backgroundColor: 'transparent',
   },
   pressed: {
     opacity: 0.7,
@@ -80,10 +107,9 @@ const styles = StyleSheet.create({
   label: {
     ...typography.label,
   },
-  labelFilled: {
-    color: colors.textOnAccent,
-  },
-  labelOutline: {
-    color: colors.primary,
+  hint: {
+    ...typography.caption,
+    fontSize: 11,
+    marginTop: 1,
   },
 });

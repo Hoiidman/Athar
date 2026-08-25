@@ -1,8 +1,11 @@
 import {
+  EmailAuthProvider,
   createUserWithEmailAndPassword,
+  linkWithCredential,
   signInAnonymously,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
+  type User,
 } from 'firebase/auth';
 import { auth } from './firebase';
 
@@ -16,6 +19,10 @@ export function signIn(email: string, password: string) {
 
 export function signInAsGuest() {
   return signInAnonymously(auth);
+}
+
+export function linkGuestAccount(user: User, email: string, password: string) {
+  return linkWithCredential(user, EmailAuthProvider.credential(email, password));
 }
 
 export function signOut() {

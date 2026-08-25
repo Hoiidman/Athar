@@ -153,6 +153,7 @@ export function CaptureScreen() {
       {voiceMode ? (
         <VoiceRecorder onRecorded={(uri) => addItem(uri, 'audio')} />
       ) : (
+        <>
         <GestureDetector gesture={pinchGesture}>
           <View style={StyleSheet.absoluteFill}>
             <CameraView
@@ -166,6 +167,14 @@ export function CaptureScreen() {
             />
           </View>
         </GestureDetector>
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          facing={facing}
+          flash={flash}
+          mode={cameraMode}
+        />
+        </>
       )}
 
       <Animated.View
