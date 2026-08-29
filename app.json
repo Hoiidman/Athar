@@ -31,7 +31,8 @@
           "microphonePermission": "Athar uses your microphone to record voice notes and video sound."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "@react-native-community/datetimepicker"
     ]
   }
 }
