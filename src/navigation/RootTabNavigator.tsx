@@ -39,7 +39,9 @@ export function RootTabNavigator({ user }: { user: User }) {
     >
       <Tab.Screen name="Capture" component={CaptureScreen} />
       <Tab.Screen name="Timeline" component={TimelineScreen} />
-      <Tab.Screen name="MemoryGroups" component={MemoryGroupsScreen} options={{ tabBarLabel: 'Albums' }} />
+      <Tab.Screen name="MemoryGroups" options={{ tabBarLabel: 'Albums' }}>
+        {() => <MemoryGroupsScreen user={user} />}
+      </Tab.Screen>
       <Tab.Screen name="FamilyPulse" options={{ tabBarLabel: 'Family' }}>
         {() => <FamilyPulseScreen user={user} />}
       </Tab.Screen>
