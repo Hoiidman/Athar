@@ -16,22 +16,21 @@ import { Button } from '../../components/Button';
 import { TextInput } from '../../components/TextInput';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
 import { cardCornerRadius, colors, minTapTarget, spacing, typography } from '../../theme';
+import type { User } from 'firebase/auth';
+import { createMemoryGroup } from '../../services/memoryGroups';
 
 interface CreateMemoryGroupScreenProps {
+  user: User;
   circleId: string | null;
   onCancel?: () => void;
-  onSubmit?: (data: {
-    title: string;
-    startDate: number;
-    endDate: number;
-    memberIds: string[];
-  }) => void;
+  onContinue?: (groupId: string) => void;
 }
 
 export function CreateMemoryGroupScreen({
+  user,
   circleId,
   onCancel,
-  onSubmit,
+  onContinue,
 }: CreateMemoryGroupScreenProps) {
   const { state: overviewState } = useFamilyCircleOverview(circleId);
 
@@ -55,7 +54,7 @@ export function CreateMemoryGroupScreen({
     setSelectedMembers(next);
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     const trimmedTitle = title.trim();
     const nextTitleError = trimmedTitle ? undefined : 'Enter a title for this group.';
     setTitleError(nextTitleError);
@@ -73,14 +72,26 @@ export function CreateMemoryGroupScreen({
       return;
     }
 
+    if (!circleId) {
+      setFormError('Family circle is missing.');
+      return;
+    }
+
     setSubmitting(true);
-    if (onSubmit) {
-      onSubmit({
+    try {
+      const groupId = await createMemoryGroup(user, circleId, {
         title: trimmedTitle,
         startDate: startDate.getTime(),
         endDate: endDate.getTime(),
         memberIds: Array.from(selectedMembers),
       });
+      if (onContinue) {
+        onContinue(groupId);
+      }
+    } catch {
+      setFormError('Could not create memory group. Check your connection.');
+    } finally {
+      setSubmitting(false);
     }
   }
 
