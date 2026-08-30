@@ -10,7 +10,7 @@ import type { MemoryGroup } from '../../types/memory';
 interface MemoryGroupsScreenProps {
   user: User;
   onCreateNew?: (circleId: string) => void;
-  onOpenGroup?: (groupId: string) => void;
+  onOpenGroup?: (groupId: string, circleId: string) => void;
 }
 
 function GroupCard({ group, onPress }: { group: MemoryGroup; onPress: () => void }) {
@@ -91,7 +91,12 @@ export function MemoryGroupsScreen({ user, onCreateNew, onOpenGroup }: MemoryGro
             </Text>
           </View>
         }
-        renderItem={({ item }) => <GroupCard group={item} onPress={() => onOpenGroup?.(item.id)} />}
+        renderItem={({ item }) => (
+          <GroupCard 
+            group={item} 
+            onPress={() => onOpenGroup?.(item.id, circleId as string)} 
+          />
+        )}
       />
     </SafeAreaView>
   );

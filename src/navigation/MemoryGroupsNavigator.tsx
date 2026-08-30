@@ -7,7 +7,7 @@ import { MemoryGroupsScreen } from '../screens/memoryGroups/MemoryGroupsScreen';
 export type MemoryGroupsStackParamList = {
   MemoryGroupsHome: undefined;
   CreateMemoryGroup: { circleId: string };
-  MemoryGroupDetail: { groupId: string };
+  MemoryGroupDetail: { groupId: string; circleId: string };
 };
 
 const Stack = createNativeStackNavigator<MemoryGroupsStackParamList>();
@@ -20,7 +20,7 @@ export function MemoryGroupsNavigator({ user }: { user: User }) {
           <MemoryGroupsScreen
             user={user}
             onCreateNew={(circleId) => navigation.navigate('CreateMemoryGroup', { circleId })}
-            onOpenGroup={(groupId) => navigation.navigate('MemoryGroupDetail', { groupId })}
+            onOpenGroup={(groupId, circleId) => navigation.navigate('MemoryGroupDetail', { groupId, circleId })}
           />
         )}
       </Stack.Screen>
@@ -38,7 +38,12 @@ export function MemoryGroupsNavigator({ user }: { user: User }) {
         )}
       </Stack.Screen>
       <Stack.Screen name="MemoryGroupDetail" options={{ headerShown: true, title: 'Memory Group' }}>
-        {({ route }) => <MemoryGroupDetailScreen groupId={route.params.groupId} />}
+        {({ route }) => (
+          <MemoryGroupDetailScreen 
+            groupId={route.params.groupId} 
+            circleId={route.params.circleId} 
+          />
+        )}
       </Stack.Screen>
     </Stack.Navigator>
   );
