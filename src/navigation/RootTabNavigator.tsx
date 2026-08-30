@@ -38,7 +38,7 @@ export function RootTabNavigator({ user }: { user: User }) {
       })}
     >
       <Tab.Screen name="Capture" component={CaptureScreen} />
-      <Tab.Screen name="Timeline" component={TimelineScreen} />
+      <Tab.Screen name="Timeline">{() => <TimelineScreen user={user} />}</Tab.Screen>
       <Tab.Screen name="MemoryGroups" options={{ tabBarLabel: 'Albums' }}>
         {() => <MemoryGroupsNavigator user={user} />}
       </Tab.Screen>
