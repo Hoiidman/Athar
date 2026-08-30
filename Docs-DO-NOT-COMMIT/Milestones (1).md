@@ -544,7 +544,7 @@ Capture screen's destination dropdown.
       rules before deploy — this is the collection where a private/shared
       visibility bug would actually leak family data - `17c4ee6`
 - [x] "Move to Memory Group" action from My Space (promote a private
-      memory to a shared group after the fact) - `PENDING`
+      memory to a shared group after the fact) - `25ccea6`
 
 **Exit criteria:** Two test accounts in the same Family Circle can both add
 photos/videos to the same Memory Group — either from the dropdown at
