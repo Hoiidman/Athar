@@ -1,5 +1,6 @@
 import type { User } from 'firebase/auth';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
 import { useMemoryGroups } from '../../hooks/useMemoryGroups';
@@ -62,7 +63,7 @@ export function MemoryGroupsScreen({ user, onCreateNew, onOpenGroup }: MemoryGro
   const groups = groupsState.status === 'ready' ? groupsState.groups : [];
 
   return (
-    <View style={styles.screen}>
+    <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Memory Groups</Text>
         {onCreateNew ? (
@@ -92,7 +93,7 @@ export function MemoryGroupsScreen({ user, onCreateNew, onOpenGroup }: MemoryGro
         }
         renderItem={({ item }) => <GroupCard group={item} onPress={() => onOpenGroup?.(item.id)} />}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -116,7 +117,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.xs,
     paddingBottom: spacing.md,
   },
   title: {

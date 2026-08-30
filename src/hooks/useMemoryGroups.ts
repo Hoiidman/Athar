@@ -43,7 +43,8 @@ export function useMemoryGroups(circleId: string | null) {
 
         setState({ status: 'ready', groups });
       },
-      () => {
+      (error) => {
+        console.error('useMemoryGroups snapshot error:', error);
         setState({ status: 'error' });
       },
     );
