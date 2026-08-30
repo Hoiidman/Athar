@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { User } from 'firebase/auth';
 import { CaptureScreen } from '../screens/capture/CaptureScreen';
 import { TimelineScreen } from '../screens/timeline/TimelineScreen';
-import { MemoryGroupsScreen } from '../screens/memoryGroups/MemoryGroupsScreen';
+import { MemoryGroupsNavigator } from './MemoryGroupsNavigator';
 import { FamilyPulseScreen } from '../screens/familyPulse/FamilyPulseScreen';
 import { colors } from '../theme';
 
@@ -40,7 +40,7 @@ export function RootTabNavigator({ user }: { user: User }) {
       <Tab.Screen name="Capture" component={CaptureScreen} />
       <Tab.Screen name="Timeline" component={TimelineScreen} />
       <Tab.Screen name="MemoryGroups" options={{ tabBarLabel: 'Albums' }}>
-        {() => <MemoryGroupsScreen user={user} />}
+        {() => <MemoryGroupsNavigator user={user} />}
       </Tab.Screen>
       <Tab.Screen name="FamilyPulse" options={{ tabBarLabel: 'Family' }}>
         {() => <FamilyPulseScreen user={user} />}

@@ -9,7 +9,7 @@ import type { MemoryGroup } from '../../types/memory';
 
 interface MemoryGroupsScreenProps {
   user: User;
-  onCreateNew?: () => void;
+  onCreateNew?: (circleId: string) => void;
   onOpenGroup?: (groupId: string) => void;
 }
 
@@ -66,10 +66,10 @@ export function MemoryGroupsScreen({ user, onCreateNew, onOpenGroup }: MemoryGro
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Memory Groups</Text>
-        {onCreateNew ? (
+        {onCreateNew && circleId ? (
           <Pressable
             style={styles.addButton}
-            onPress={onCreateNew}
+            onPress={() => onCreateNew(circleId)}
             accessibilityRole="button"
             accessibilityLabel="Create Memory Group"
           >
