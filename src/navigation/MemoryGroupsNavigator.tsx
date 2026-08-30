@@ -1,11 +1,13 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { User } from 'firebase/auth';
 import { CreateMemoryGroupScreen } from '../screens/memoryGroups/CreateMemoryGroupScreen';
+import { MemoryGroupDetailScreen } from '../screens/memoryGroups/MemoryGroupDetailScreen';
 import { MemoryGroupsScreen } from '../screens/memoryGroups/MemoryGroupsScreen';
 
 export type MemoryGroupsStackParamList = {
   MemoryGroupsHome: undefined;
   CreateMemoryGroup: { circleId: string };
+  MemoryGroupDetail: { groupId: string };
 };
 
 const Stack = createNativeStackNavigator<MemoryGroupsStackParamList>();
@@ -18,6 +20,7 @@ export function MemoryGroupsNavigator({ user }: { user: User }) {
           <MemoryGroupsScreen
             user={user}
             onCreateNew={(circleId) => navigation.navigate('CreateMemoryGroup', { circleId })}
+            onOpenGroup={(groupId) => navigation.navigate('MemoryGroupDetail', { groupId })}
           />
         )}
       </Stack.Screen>
@@ -33,6 +36,9 @@ export function MemoryGroupsNavigator({ user }: { user: User }) {
             onContinue={() => navigation.goBack()}
           />
         )}
+      </Stack.Screen>
+      <Stack.Screen name="MemoryGroupDetail" options={{ headerShown: true, title: 'Memory Group' }}>
+        {({ route }) => <MemoryGroupDetailScreen groupId={route.params.groupId} />}
       </Stack.Screen>
     </Stack.Navigator>
   );
