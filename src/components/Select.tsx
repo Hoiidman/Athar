@@ -50,7 +50,7 @@ export function Select({
         <Ionicons name="chevron-down" size={20} color={colors.uiIcon} />
       </Pressable>
 
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable
           style={styles.backdrop}
           onPress={() => setOpen(false)}
@@ -71,7 +71,7 @@ export function Select({
               >
                 <Text style={styles.rowLabel}>{option.label}</Text>
                 {option.value === value ? (
-                  <Ionicons name="checkmark" size={20} color={colors.primary} />
+                  <Ionicons name="checkmark" size={20} color={colors.sageIcon} />
                 ) : null}
               </Pressable>
             ))}

@@ -5,7 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
 import { useMemoryGroups } from '../../hooks/useMemoryGroups';
 import { colors, spacing, typography, cardCornerRadius, cardShadow } from '../../theme';
-import type { MemoryGroup } from '../../types/memory';
+import { Button } from '../../components/Button';
+import type { MemoryGroup, MemoryGroupCategory } from '../../types/memory';
 
 interface MemoryGroupsScreenProps {
   user: User;
@@ -13,10 +14,18 @@ interface MemoryGroupsScreenProps {
   onOpenGroup?: (groupId: string, circleId: string) => void;
 }
 
+const CATEGORY_ICONS: Record<MemoryGroupCategory, keyof typeof Ionicons.glyphMap> = {
+  vacation: 'airplane',
+  event: 'calendar',
+  holiday: 'partly-sunny',
+  other: 'albums',
+};
+
 function GroupCard({ group, onPress }: { group: MemoryGroup; onPress: () => void }) {
   const start = new Date(group.startDate).toLocaleDateString();
   const end = new Date(group.endDate).toLocaleDateString();
-  const dates = start === end ? start : `${start} – ${end}`;
+  const dates = start === end ? start : `${start} — ${end}`;
+  const iconName = group.category ? CATEGORY_ICONS[group.category] : 'albums-outline';
 
   return (
     <Pressable
@@ -25,7 +34,12 @@ function GroupCard({ group, onPress }: { group: MemoryGroup; onPress: () => void
       accessibilityRole="button"
     >
       <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle}>{group.title}</Text>
+        <View style={styles.titleRow}>
+          <View style={styles.iconContainer}>
+            <Ionicons name={iconName} size={20} color={colors.sageIcon} />
+          </View>
+          <Text style={styles.cardTitle}>{group.title}</Text>
+        </View>
         <Ionicons name="chevron-forward" size={20} color={colors.uiIcon} />
       </View>
       <Text style={styles.cardDates}>{dates}</Text>
@@ -89,13 +103,15 @@ export function MemoryGroupsScreen({ user, onCreateNew, onOpenGroup }: MemoryGro
             <Text style={styles.emptySubtitle}>
               Create a shared memory group for your next family trip or event.
             </Text>
+            {onCreateNew && circleId && (
+              <View style={styles.emptyAction}>
+                <Button label="Create your first group" onPress={() => onCreateNew(circleId)} />
+              </View>
+            )}
           </View>
         }
         renderItem={({ item }) => (
-          <GroupCard 
-            group={item} 
-            onPress={() => onOpenGroup?.(item.id, circleId as string)} 
-          />
+          <GroupCard group={item} onPress={() => onOpenGroup?.(item.id, circleId as string)} />
         )}
       />
     </SafeAreaView>
@@ -158,11 +174,25 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: spacing.xs,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  iconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
   cardTitle: {
     ...typography.heading,
     color: colors.textPrimary,
     flex: 1,
-    marginRight: spacing.sm,
   },
   cardDates: {
     ...typography.body,
@@ -188,5 +218,9 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  emptyAction: {
+    marginTop: spacing.md,
+    width: '100%',
   },
 });

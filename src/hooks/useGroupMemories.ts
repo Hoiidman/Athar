@@ -23,6 +23,7 @@ export function useGroupMemories(circleId: string | null, groupId: string | null
       collection(firestore, 'memories'),
       where('familyCircleId', '==', circleId),
       where('memoryGroupId', '==', groupId),
+      where('visibility', '==', 'shared')
     );
 
     const unsubscribe = onSnapshot(

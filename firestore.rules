@@ -236,18 +236,19 @@ service cloud.firestore {
     }
 
     function memoryGroupFields() {
-      return ['familyCircleId', 'title', 'startDate', 'endDate', 'memberIds',
+      return ['familyCircleId', 'title', 'category', 'startDate', 'endDate', 'memberIds',
               'coverPhotoUrl', 'createdBy', 'createdAt', 'updatedAt'];
     }
 
     function isValidMemoryGroup(data) {
       return data.keys().hasOnly(memoryGroupFields())
-        && data.keys().hasAll(memoryGroupFields())
+        && data.keys().hasAll(['familyCircleId', 'title', 'startDate', 'endDate', 'memberIds', 'createdBy', 'createdAt', 'updatedAt'])
         && data.familyCircleId is string
         && data.familyCircleId.size() <= 128
         && data.title is string
         && data.title.size() > 0
         && data.title.size() <= 80
+        && (!('category' in data) || data.category in ['vacation', 'event', 'holiday', 'other'])
         && data.startDate is timestamp
         && data.endDate is timestamp
         && data.startDate <= data.endDate
@@ -314,9 +315,8 @@ service cloud.firestore {
 
     match /memories/{memoryId} {
       allow get, list: if isSignedIn() 
-        && inCircle(resource.data.familyCircleId)
         && (
-          resource.data.visibility == 'shared' 
+          (inCircle(resource.data.familyCircleId) && resource.data.visibility == 'shared')
           || resource.data.uploadedBy == request.auth.uid
         );
 

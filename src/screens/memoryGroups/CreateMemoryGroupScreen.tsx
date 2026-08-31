@@ -10,10 +10,11 @@ import {
   Text,
   View,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
 import { TextInput } from '../../components/TextInput';
+import { Select } from '../../components/Select';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
 import { cardCornerRadius, colors, minTapTarget, spacing, typography } from '../../theme';
 import type { User } from 'firebase/auth';
@@ -26,6 +27,13 @@ interface CreateMemoryGroupScreenProps {
   onContinue?: (groupId: string) => void;
 }
 
+const CATEGORY_OPTIONS = [
+  { label: 'Vacation', value: 'vacation' },
+  { label: 'Event', value: 'event' },
+  { label: 'Holiday', value: 'holiday' },
+  { label: 'Other', value: 'other' },
+];
+
 export function CreateMemoryGroupScreen({
   user,
   circleId,
@@ -36,6 +44,7 @@ export function CreateMemoryGroupScreen({
 
   const [title, setTitle] = useState('');
   const [titleError, setTitleError] = useState<string>();
+  const [category, setCategory] = useState<string | null>(null);
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
   const [showStartPicker, setShowStartPicker] = useState(false);
@@ -55,12 +64,14 @@ export function CreateMemoryGroupScreen({
   }
 
   async function handleSubmit() {
-    const trimmedTitle = title.trim();
-    const nextTitleError = trimmedTitle ? undefined : 'Enter a title for this group.';
-    setTitleError(nextTitleError);
+    setTitleError(undefined);
     setFormError(undefined);
 
-    if (nextTitleError) return;
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      setTitleError('Title is required.');
+      return;
+    }
 
     if (startDate > endDate) {
       setFormError('Start date must be before or equal to the end date.');
@@ -81,6 +92,7 @@ export function CreateMemoryGroupScreen({
     try {
       const groupId = await createMemoryGroup(user, circleId, {
         title: trimmedTitle,
+        category: category ?? undefined,
         startDate: startDate.getTime(),
         endDate: endDate.getTime(),
         memberIds: Array.from(selectedMembers),
@@ -167,6 +179,14 @@ export function CreateMemoryGroupScreen({
             editable={!submitting}
           />
 
+          <Select
+            label="Category"
+            value={category}
+            options={CATEGORY_OPTIONS}
+            onSelect={setCategory}
+            placeholder="Select a category..."
+          />
+
           <View style={styles.dateRow}>
             <View style={styles.dateField}>
               <Text style={styles.label}>Start Date</Text>
@@ -178,17 +198,20 @@ export function CreateMemoryGroupScreen({
                 <Text style={styles.dateText}>{startDate.toLocaleDateString()}</Text>
                 <Ionicons name="calendar-outline" size={20} color={colors.uiIcon} />
               </Pressable>
-              {showStartPicker && (
-                <DateTimePicker
-                  value={startDate}
-                  mode="date"
-                  display="default"
-                  onChange={(_, date) => {
-                    setShowStartPicker(Platform.OS === 'ios');
-                    if (date) setStartDate(date);
-                  }}
-                />
-              )}
+              <DateTimePickerModal
+                isVisible={showStartPicker}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                date={startDate}
+                isDarkModeEnabled={false}
+                themeVariant="light"
+                textColor={colors.textPrimary}
+                onConfirm={(date) => {
+                  setStartDate(date);
+                  setShowStartPicker(false);
+                }}
+                onCancel={() => setShowStartPicker(false)}
+              />
             </View>
 
             <View style={styles.dateField}>
@@ -201,17 +224,20 @@ export function CreateMemoryGroupScreen({
                 <Text style={styles.dateText}>{endDate.toLocaleDateString()}</Text>
                 <Ionicons name="calendar-outline" size={20} color={colors.uiIcon} />
               </Pressable>
-              {showEndPicker && (
-                <DateTimePicker
-                  value={endDate}
-                  mode="date"
-                  display="default"
-                  onChange={(_, date) => {
-                    setShowEndPicker(Platform.OS === 'ios');
-                    if (date) setEndDate(date);
-                  }}
-                />
-              )}
+              <DateTimePickerModal
+                isVisible={showEndPicker}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                date={endDate}
+                isDarkModeEnabled={false}
+                themeVariant="light"
+                textColor={colors.textPrimary}
+                onConfirm={(date) => {
+                  setEndDate(date);
+                  setShowEndPicker(false);
+                }}
+                onCancel={() => setShowEndPicker(false)}
+              />
             </View>
           </View>
 

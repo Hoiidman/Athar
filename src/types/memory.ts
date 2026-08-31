@@ -27,10 +27,13 @@ export interface Memory {
   updatedAt: number;
 }
 
+export type MemoryGroupCategory = 'vacation' | 'event' | 'holiday' | 'other';
+
 export interface MemoryGroup {
   id: string;
   familyCircleId: string;
   title: string;
+  category?: MemoryGroupCategory;
   startDate: number;
   endDate: number;
   memberIds: string[];

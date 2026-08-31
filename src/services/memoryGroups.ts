@@ -7,6 +7,7 @@ export async function createMemoryGroup(
   familyCircleId: string,
   data: {
     title: string;
+    category?: string;
     startDate: number;
     endDate: number;
     memberIds: string[];
@@ -16,7 +17,7 @@ export async function createMemoryGroup(
   const members = new Set(data.memberIds);
   members.add(user.uid);
 
-  const payload = {
+  const payload: any = {
     familyCircleId,
     title: data.title.trim(),
     startDate: new Date(data.startDate),
@@ -27,6 +28,10 @@ export async function createMemoryGroup(
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
+
+  if (data.category) {
+    payload.category = data.category;
+  }
 
   const coll = collection(firestore, 'memoryGroups');
   const ref = await addDoc(coll, payload);
