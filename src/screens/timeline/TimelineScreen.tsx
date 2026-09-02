@@ -16,9 +16,11 @@ import type { User } from 'firebase/auth';
 import { useMySpaceMemories } from '../../hooks/useMySpaceMemories';
 import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
 import { useMemoryGroups } from '../../hooks/useMemoryGroups';
-import { moveMemoryToGroup } from '../../services/memories';
+import { moveMemoryToGroup, uploadBatchedMemories } from '../../services/memories';
 import type { Memory } from '../../types/memory';
 import { colors, spacing, typography } from '../../theme';
+import { BulkUploadScreen, type CategorizedPhoto } from '../upload/BulkUploadScreen';
+import { UploadProgressScreen } from '../upload/UploadProgressScreen';
 
 interface TimelineScreenProps {
   user: User;
@@ -37,6 +39,10 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [moving, setMoving] = useState(false);
 
+  // Bulk Upload State
+  const [uploadMode, setUploadMode] = useState<'idle' | 'selecting' | 'uploading'>('idle');
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+
   async function handleMove(groupId: string) {
     if (!selectedMemory) return;
     setMoving(true);
@@ -47,6 +53,29 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
       console.error('Failed to move memory:', e);
     } finally {
       setMoving(false);
+    }
+  }
+
+  async function handleStartUpload(photos: CategorizedPhoto[]) {
+    if (!circleId) return;
+    setUploadMode('uploading');
+    setUploadProgress({ current: 0, total: photos.length });
+
+    try {
+      await uploadBatchedMemories(
+        user,
+        circleId,
+        photos.map((p) => ({
+          uri: p.uri,
+          groupId: p.selectedGroupId,
+          takenAtMs: p.creationTimeMs,
+        })),
+        (current, total) => setUploadProgress({ current, total }),
+      );
+    } catch (e) {
+      console.error('Upload failed', e);
+    } finally {
+      setUploadMode('idle');
     }
   }
 
@@ -113,6 +142,27 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
           </Pressable>
         )}
       />
+
+      <Pressable
+        style={styles.fab}
+        onPress={() => setUploadMode('selecting')}
+        accessibilityRole="button"
+        accessibilityLabel="Bulk Upload Photos"
+      >
+        <Ionicons name="images" size={24} color={colors.textOnAccent} />
+      </Pressable>
+
+      <Modal visible={uploadMode === 'selecting'} animationType="slide">
+        <BulkUploadScreen
+          user={user}
+          onCancel={() => setUploadMode('idle')}
+          onUpload={handleStartUpload}
+        />
+      </Modal>
+
+      <Modal visible={uploadMode === 'uploading'} animationType="fade">
+        <UploadProgressScreen current={uploadProgress.current} total={uploadProgress.total} />
+      </Modal>
 
       <Modal
         visible={!!selectedMemory}
@@ -255,5 +305,21 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textPrimary,
     flex: 1,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: spacing.lg,
+    right: spacing.lg,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
 });

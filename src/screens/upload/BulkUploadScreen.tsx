@@ -46,8 +46,11 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
 
   function updatePhotoGroup(index: number, groupId: string) {
     const next = [...photos];
-    next[index].selectedGroupId = groupId;
-    setPhotos(next);
+    const photo = next[index];
+    if (photo) {
+      photo.selectedGroupId = groupId;
+      setPhotos(next);
+    }
     setEditingPhotoIndex(null);
   }
 
