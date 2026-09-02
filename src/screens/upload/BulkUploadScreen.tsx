@@ -57,11 +57,11 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
   async function handleSelectPhotos() {
     setError(undefined);
     try {
+      // We request MediaLibrary permissions for iOS date fallback.
+      // If it fails (e.g. Android Expo Go restriction), we don't block the user, 
+      // because Android successfully provides EXIF dates via the image picker anyway.
       const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
-        setError('Media library permission is required to read photo dates.');
-        return;
-      }
+      const canUseMediaLibrary = status === 'granted';
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -97,7 +97,7 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
         }
 
         // Fallback to media library if assetId is present (iOS)
-        if (!creationTimeMs && asset.assetId != null) {
+        if (!creationTimeMs && asset.assetId != null && canUseMediaLibrary) {
           const mediaAsset = await MediaLibrary.getAssetInfoAsync(asset.assetId);
           if (mediaAsset && mediaAsset.creationTime) {
             creationTimeMs = mediaAsset.creationTime;
