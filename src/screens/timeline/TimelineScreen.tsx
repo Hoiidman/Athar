@@ -31,10 +31,10 @@ const screenWidth = Dimensions.get('window').width;
 const imageSize = screenWidth / numColumns;
 
 export function TimelineScreen({ user }: TimelineScreenProps) {
-  const memoriesState = useMySpaceMemories(user.uid);
   const { state: membershipState } = useFamilyCircleMembership(user);
   const circleId = membershipState.status === 'ready' ? membershipState.circleId : null;
   const groupsState = useMemoryGroups(circleId);
+  const memoriesState = useMySpaceMemories(user.uid, circleId);
 
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [moving, setMoving] = useState(false);

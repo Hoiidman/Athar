@@ -8,14 +8,20 @@ export type MySpaceMemoriesState =
   | { status: 'error'; error: Error }
   | { status: 'ready'; memories: Memory[] };
 
-export function useMySpaceMemories(userId: string) {
+export function useMySpaceMemories(userId: string, circleId: string | null) {
   const [state, setState] = useState<MySpaceMemoriesState>({ status: 'loading' });
 
   useEffect(() => {
+    if (!circleId) {
+      setState({ status: 'loading' });
+      return;
+    }
+
     setState({ status: 'loading' });
 
     const q = query(
       collection(firestore, 'memories'),
+      where('familyCircleId', '==', circleId),
       where('uploadedBy', '==', userId),
       where('memoryGroupId', '==', 'my-space'),
     );
@@ -59,7 +65,7 @@ export function useMySpaceMemories(userId: string) {
     );
 
     return () => unsubscribe();
-  }, [userId]);
+  }, [userId, circleId]);
 
   return state;
 }
