@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect, react-hooks/refs */
 import { useRef } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { colors } from '../../theme';

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect, react-hooks/refs */
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,

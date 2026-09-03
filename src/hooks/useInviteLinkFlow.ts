@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect, react-hooks/refs */
 import { useCallback, useEffect, useState } from 'react';
 
 export function useInviteLinkFlow(

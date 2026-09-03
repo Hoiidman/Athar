@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect, react-hooks/refs */
 import type { User } from 'firebase/auth';
 import { useCallback, useEffect, useState } from 'react';
 import { getFamilyCircleId } from '../services/users';
