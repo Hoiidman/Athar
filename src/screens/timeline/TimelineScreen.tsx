@@ -1,13 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Dimensions,
   FlatList,
   Image,
+  LayoutAnimation,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
+  UIManager,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,6 +34,11 @@ const numColumns = 3;
 const screenWidth = Dimensions.get('window').width;
 const imageSize = screenWidth / numColumns;
 
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 export function TimelineScreen({ user }: TimelineScreenProps) {
   const { state: membershipState } = useFamilyCircleMembership(user);
   const circleId = membershipState.status === 'ready' ? membershipState.circleId : null;
@@ -40,8 +49,29 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
   const [moving, setMoving] = useState(false);
 
   // Bulk Upload State
-  const [uploadMode, setUploadMode] = useState<'idle' | 'selecting' | 'uploading'>('idle');
+  const [uploadMode, setUploadMode] = useState<'idle' | 'selecting' | 'uploading' | 'done'>('idle');
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+
+  // Pop animation: trigger LayoutAnimation when memory count changes
+  const prevCountRef = useRef(0);
+  useEffect(() => {
+    if (memoriesState.status === 'ready') {
+      const newCount = memoriesState.memories.length;
+      if (newCount > prevCountRef.current) {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
+      }
+      prevCountRef.current = newCount;
+    }
+  }, [memoriesState]);
+
+  // Scale animation for the FAB
+  const fabScale = useRef(new Animated.Value(1)).current;
+  function animateFab() {
+    Animated.sequence([
+      Animated.timing(fabScale, { toValue: 0.85, duration: 80, useNativeDriver: true }),
+      Animated.spring(fabScale, { toValue: 1, friction: 3, useNativeDriver: true }),
+    ]).start();
+  }
 
   async function handleMove(groupId: string) {
     if (!selectedMemory) return;
@@ -72,9 +102,11 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
         })),
         (current, total) => setUploadProgress({ current, total }),
       );
+      setUploadMode('done');
+      // Auto-dismiss after 2 seconds
+      setTimeout(() => setUploadMode('idle'), 2000);
     } catch (e) {
       console.error('Upload failed', e);
-    } finally {
       setUploadMode('idle');
     }
   }
@@ -97,11 +129,20 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
 
   const { memories } = memoriesState;
   const groups = groupsState.status === 'ready' ? groupsState.groups : [];
+  const photoCount = memories.length;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>My Space</Text>
+        <View>
+          <Text style={styles.title}>My Space</Text>
+          <Text style={styles.headerSubtitle}>
+            {photoCount === 0
+              ? 'Your private collection'
+              : `${photoCount} ${photoCount === 1 ? 'memory' : 'memories'}`}
+          </Text>
+        </View>
+        <Ionicons name="lock-closed" size={18} color={colors.sageIcon} />
       </View>
 
       <FlatList
@@ -143,14 +184,19 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
         )}
       />
 
-      <Pressable
-        style={styles.fab}
-        onPress={() => setUploadMode('selecting')}
-        accessibilityRole="button"
-        accessibilityLabel="Bulk Upload Photos"
-      >
-        <Ionicons name="images" size={24} color={colors.textOnAccent} />
-      </Pressable>
+      <Animated.View style={[styles.fab, { transform: [{ scale: fabScale }] }]}>
+        <Pressable
+          style={styles.fabInner}
+          onPress={() => {
+            animateFab();
+            setUploadMode('selecting');
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Bulk Upload Photos"
+        >
+          <Ionicons name="images" size={24} color={colors.textOnAccent} />
+        </Pressable>
+      </Animated.View>
 
       <Modal visible={uploadMode === 'selecting'} animationType="slide">
         <BulkUploadScreen
@@ -160,8 +206,18 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
         />
       </Modal>
 
-      <Modal visible={uploadMode === 'uploading'} animationType="fade">
-        <UploadProgressScreen current={uploadProgress.current} total={uploadProgress.total} />
+      <Modal visible={uploadMode === 'uploading' || uploadMode === 'done'} animationType="fade">
+        {uploadMode === 'done' ? (
+          <View style={[styles.screen, styles.centered]}>
+            <Ionicons name="checkmark-circle" size={64} color={colors.success} />
+            <Text style={styles.successTitle}>Upload Complete!</Text>
+            <Text style={styles.successSubtitle}>
+              {uploadProgress.total} {uploadProgress.total === 1 ? 'memory' : 'memories'} added
+            </Text>
+          </View>
+        ) : (
+          <UploadProgressScreen current={uploadProgress.current} total={uploadProgress.total} />
+        )}
       </Modal>
 
       <Modal
@@ -210,6 +266,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingTop: spacing.xs,
     paddingBottom: spacing.sm,
@@ -218,9 +277,15 @@ const styles = StyleSheet.create({
     ...typography.heading,
     color: colors.textPrimary,
   },
+  headerSubtitle: {
+    ...typography.label,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
   centered: {
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.sm,
   },
   emptyContainer: {
     flex: 1,
@@ -314,12 +379,24 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
+  },
+  fabInner: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  successTitle: {
+    ...typography.heading,
+    color: colors.textPrimary,
+  },
+  successSubtitle: {
+    ...typography.body,
+    color: colors.textSecondary,
   },
 });
