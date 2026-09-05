@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Image } from 'expo-image';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { Modal, View, Text,  StyleSheet, Pressable, ActivityIndicator, Alert, Dimensions, FlatList } from 'react-native';
 import { useRef } from "react";
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +8,22 @@ import { Memory } from '../types/memory';
 import { colors, spacing, typography } from '../theme';
 import { deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { firestore } from '../services/firebase';
+
+
+function VideoItem({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, player => {
+    player.loop = true;
+    player.play();
+  });
+
+  return (
+    <VideoView
+      style={styles.image}
+      player={player}
+      nativeControls={true}
+    />
+  );
+}
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -107,13 +124,17 @@ export function ImageViewerModal({ memories, initialMemoryId, onClose, showDetai
           }}
           renderItem={({ item }) => (
             <View style={{ width: screenWidth, height: '100%', justifyContent: 'center', alignItems: 'center' }}>
-              <Image
-                source={{ uri: item.storageUrl }}
-                style={styles.image}
-                contentFit="contain"
-                transition={200}
-                cachePolicy="memory-disk"
-              />
+              {item.type === 'video' ? (
+                <VideoItem uri={item.storageUrl} />
+              ) : (
+                <Image
+                  source={{ uri: item.storageUrl }}
+                  style={styles.image}
+                  contentFit="contain"
+                  transition={200}
+                  cachePolicy="memory-disk"
+                />
+              )}
             </View>
           )}
         />

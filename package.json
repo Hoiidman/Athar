@@ -21,6 +21,7 @@
     "expo-linking": "~57.0.9",
     "expo-media-library": "~57.0.4",
     "expo-status-bar": "~57.0.1",
+    "expo-video": "~57.0.3",
     "firebase": "^12.17.1",
     "react": "19.2.3",
     "react-native": "0.86.3",

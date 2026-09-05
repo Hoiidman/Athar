@@ -20,6 +20,8 @@ export async function uploadBatchedMemories(
     uri: string;
     groupId: string; // can be 'my-space'
     takenAtMs: number | null;
+    type: "photo" | "video";
+    durationSeconds?: number;
   }[],
   onProgress: (current: number, total: number) => void,
 ) {

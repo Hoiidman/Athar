@@ -123,7 +123,9 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
           uri: p.uri,
           groupId: p.selectedGroupId,
           takenAtMs: p.creationTimeMs,
-        })),
+            type: p.type,
+            durationSeconds: p.durationSeconds,
+          })),
         (current, total) => setUploadProgress({ current, total }),
       );
       setUploadMode('done');

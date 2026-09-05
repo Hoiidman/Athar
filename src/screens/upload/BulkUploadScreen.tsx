@@ -21,6 +21,8 @@ export interface CategorizedPhoto {
   width: number;
   height: number;
   creationTimeMs: number | null;
+  type: "photo" | "video";
+  durationSeconds?: number;
   matchedGroupIds: string[];
   selectedGroupId: string;
 }
@@ -64,7 +66,7 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
       const canUseMediaLibrary = status === 'granted';
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
         allowsMultipleSelection: true,
         quality: 1,
         exif: true,
@@ -78,6 +80,8 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
 
       for (const asset of result.assets) {
         let creationTimeMs: number | null = null;
+        const isVideo = asset.type === "video";
+        const durationSeconds = isVideo && asset.duration ? asset.duration / 1000 : undefined;
 
         // Try EXIF first (works well on Android with expo-image-picker if exif: true)
         if (asset.exif && asset.exif.DateTimeOriginal) {
@@ -116,6 +120,8 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
           uri: asset.uri,
           width: asset.width,
           height: asset.height,
+          type: isVideo ? "video" : "photo",
+          durationSeconds,
           creationTimeMs,
           matchedGroupIds,
           selectedGroupId,
