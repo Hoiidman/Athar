@@ -29,6 +29,8 @@ export function useMemoryGroups(circleId: string | null) {
             id: doc.id,
             familyCircleId: data.familyCircleId,
             title: data.title,
+            category: data.category ?? undefined,
+            icon: data.icon ?? null,
             startDate: data.startDate?.toMillis() ?? 0,
             endDate: data.endDate?.toMillis() ?? 0,
             memberIds: data.memberIds ?? [],
@@ -55,3 +57,5 @@ export function useMemoryGroups(circleId: string | null) {
 
   return state;
 }
+
+

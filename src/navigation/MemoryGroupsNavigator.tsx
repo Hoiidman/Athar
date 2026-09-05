@@ -3,10 +3,11 @@ import type { User } from 'firebase/auth';
 import { CreateMemoryGroupScreen } from '../screens/memoryGroups/CreateMemoryGroupScreen';
 import { MemoryGroupDetailScreen } from '../screens/memoryGroups/MemoryGroupDetailScreen';
 import { MemoryGroupsScreen } from '../screens/memoryGroups/MemoryGroupsScreen';
+import type { MemoryGroup } from '../types/memory';
 
 export type MemoryGroupsStackParamList = {
   MemoryGroupsHome: undefined;
-  CreateMemoryGroup: { circleId: string };
+  CreateMemoryGroup: { circleId: string; initialGroup?: MemoryGroup };
   MemoryGroupDetail: { groupId: string; circleId: string };
 };
 
@@ -26,22 +27,24 @@ export function MemoryGroupsNavigator({ user }: { user: User }) {
       </Stack.Screen>
       <Stack.Screen
         name="CreateMemoryGroup"
-        options={{ headerShown: true, title: 'New Memory Group' }}
+        options={({ route }) => ({ headerShown: true, title: route.params?.initialGroup ? 'Edit Memory Group' : 'New Memory Group' })}
       >
         {({ navigation, route }) => (
           <CreateMemoryGroupScreen
             user={user}
             circleId={route.params.circleId}
+            initialGroup={route.params.initialGroup}
             onCancel={() => navigation.goBack()}
             onContinue={() => navigation.goBack()}
           />
         )}
       </Stack.Screen>
       <Stack.Screen name="MemoryGroupDetail" options={{ headerShown: true, title: 'Memory Group' }}>
-        {({ route }) => (
+        {({ navigation, route }) => (
           <MemoryGroupDetailScreen 
             groupId={route.params.groupId} 
             circleId={route.params.circleId} 
+            navigation={navigation}
           />
         )}
       </Stack.Screen>
