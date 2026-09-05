@@ -1,5 +1,6 @@
 import type { User } from 'firebase/auth';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from "react";
+import { RefreshControl, ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
@@ -55,6 +56,8 @@ export function MemoryGroupsScreen({ user, onCreateNew, onOpenGroup }: MemoryGro
   const circleId = membershipState.status === 'ready' ? membershipState.circleId : null;
 
   const groupsState = useMemoryGroups(circleId);
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 1000); };
 
   if (membershipState.status === 'loading' || groupsState.status === 'loading') {
     return (
@@ -93,6 +96,7 @@ export function MemoryGroupsScreen({ user, onCreateNew, onOpenGroup }: MemoryGro
       </View>
 
       <FlatList
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         data={groups}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}

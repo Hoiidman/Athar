@@ -24,7 +24,7 @@ export function useMySpaceMemories(userId: string, circleId: string | null) {
       collection(firestore, 'memories'),
       where('familyCircleId', '==', circleId),
       where('uploadedBy', '==', userId),
-      where('memoryGroupId', '==', 'my-space'),
+      
     );
 
     const unsubscribe = onSnapshot(
@@ -70,3 +70,4 @@ export function useMySpaceMemories(userId: string, circleId: string | null) {
 
   return state;
 }
+

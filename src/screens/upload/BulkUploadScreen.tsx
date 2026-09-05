@@ -146,7 +146,10 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
           </View>
         ) : null}
 
-        <Button label="Select Photos" onPress={handleSelectPhotos} loading={loading} />
+        <View style={{ gap: 12, width: "100%" }}>
+          <Button label="Select Photos" onPress={handleSelectPhotos} loading={loading} />
+          <Button label="Cancel" variant="secondary" onPress={onCancel} disabled={loading} />
+        </View>
       </View>
     );
   }

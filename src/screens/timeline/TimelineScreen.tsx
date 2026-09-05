@@ -1,11 +1,12 @@
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/refs */
+import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
   Dimensions,
   FlatList,
-  Image,
+  
   LayoutAnimation,
   Modal,
   Platform,
@@ -20,12 +21,15 @@ import { Ionicons } from '@expo/vector-icons';
 import type { User } from 'firebase/auth';
 import { useMySpaceMemories } from '../../hooks/useMySpaceMemories';
 import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
+import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
 import { useMemoryGroups } from '../../hooks/useMemoryGroups';
 import { moveMemoryToGroup, uploadBatchedMemories } from '../../services/memories';
 import type { Memory } from '../../types/memory';
 import { colors, spacing, typography } from '../../theme';
 import { BulkUploadScreen, type CategorizedPhoto } from '../upload/BulkUploadScreen';
 import { UploadProgressScreen } from '../upload/UploadProgressScreen';
+import { ImageViewerModal } from '../../components/ImageViewerModal';
+import { RefreshControl } from 'react-native';
 
 interface TimelineScreenProps {
   user: User;
@@ -43,10 +47,29 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 export function TimelineScreen({ user }: TimelineScreenProps) {
   const { state: membershipState } = useFamilyCircleMembership(user);
   const circleId = membershipState.status === 'ready' ? membershipState.circleId : null;
+  const { state: overviewState } = useFamilyCircleOverview(circleId);
   const groupsState = useMemoryGroups(circleId);
   const memoriesState = useMySpaceMemories(user.uid, circleId);
 
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
+  const [viewingMemory, setViewingMemory] = useState<Memory | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [refreshing, setRefreshing] = useState(false);
+
+  function toggleSelection(id: string) {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    if (next.size === 0) setSelectionMode(false);
+    setSelectedIds(next);
+  }
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 1000);
+  };
+
   const [moving, setMoving] = useState(false);
 
   // Bulk Upload State
@@ -147,6 +170,7 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
       </View>
 
       <FlatList
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         data={memories}
         numColumns={numColumns}
         keyExtractor={(item) => item.id}
@@ -160,16 +184,26 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
             </Text>
           </View>
         }
-        renderItem={({ item }) => (
+        renderItem={({ item }) => {
+          const isSelected = selectedIds.has(item.id);
+          const group = groups.find(g => g.id === item.memoryGroupId);
+          return (
           <Pressable
-            style={styles.imageContainer}
-            onLongPress={() => setSelectedMemory(item)}
+            style={[styles.imageContainer, isSelected && { opacity: 0.7, borderWidth: 2, borderColor: colors.primary }]}
+            onLongPress={() => { setSelectionMode(true); toggleSelection(item.id); }}
+            onPress={() => {
+              if (selectionMode) {
+                toggleSelection(item.id);
+              } else {
+                setViewingMemory(item);
+              }
+            }}
             delayLongPress={250}
           >
             <Image
               source={{ uri: item.thumbnailUrl ?? item.storageUrl }}
               style={styles.image}
-              resizeMode="cover"
+              contentFit="cover" transition={200} cachePolicy="memory-disk"
             />
             {item.type === 'video' && (
               <View style={styles.iconOverlay}>
@@ -181,8 +215,25 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
                 <Ionicons name="mic" size={24} color="#fff" />
               </View>
             )}
+            {isSelected && (
+              <View style={[styles.iconOverlay, { backgroundColor: colors.primary, borderRadius: 12, padding: 2 }]}>
+                <Ionicons name="checkmark" size={20} color="#fff" />
+              </View>
+            )}
+            {group?.icon && !isSelected && (
+              <View style={[styles.iconOverlay, { top: 4, left: 4, right: undefined, backgroundColor: 'rgba(255,255,255,0.8)', padding: 2, borderRadius: 12 }]}>
+                <Text style={{ fontSize: 16 }}>{group.icon}</Text>
+              </View>
+            )}
           </Pressable>
-        )}
+          );
+        }}
+      />
+      <ImageViewerModal
+        memories={memories}
+        initialMemoryId={viewingMemory?.id ?? null}
+        onClose={() => setViewingMemory(null)}
+        showDetails={false}
       />
 
       <Animated.View style={[styles.fab, { transform: [{ scale: fabScale }] }]}>
