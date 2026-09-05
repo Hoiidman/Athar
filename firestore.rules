@@ -343,7 +343,7 @@ service cloud.firestore {
         && request.resource.data.aiStory == resource.data.aiStory
         && request.resource.data.aiStatus == resource.data.aiStatus;
 
-      allow delete: if false;
+      allow delete: if isSignedIn() && inCircle(resource.data.familyCircleId);
     }
 
     match /{document=**} {
