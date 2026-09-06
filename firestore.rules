@@ -11,6 +11,11 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function inCircle(circleId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/familyCircles/$(circleId)/members/$(request.auth.uid));
+    }
+
     function userFields() {
       return ['displayName', 'photoUrl', 'familyCircleId', 'createdAt', 'updatedAt'];
     }
@@ -228,6 +233,116 @@ service cloud.firestore {
       allow delete: if isSignedIn()
         && get(/databases/$(database)/documents/familyCircles/$(resource.data.familyCircleId)).data.ownerId == request.auth.uid
         && getAfter(/databases/$(database)/documents/familyCircles/$(resource.data.familyCircleId)).data.inviteCode != code;
+    }
+
+    function memoryGroupFields() {
+      return ['familyCircleId', 'title', 'category', 'startDate', 'endDate', 'memberIds',
+              'coverPhotoUrl', 'createdBy', 'createdAt', 'updatedAt'];
+    }
+
+    function isValidMemoryGroup(data) {
+      return data.keys().hasOnly(memoryGroupFields())
+        && data.keys().hasAll(['familyCircleId', 'title', 'startDate', 'endDate', 'memberIds', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.familyCircleId is string
+        && data.familyCircleId.size() <= 128
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 80
+        && (!('category' in data) || data.category in ['vacation', 'event', 'holiday', 'other'])
+        && data.startDate is timestamp
+        && data.endDate is timestamp
+        && data.startDate <= data.endDate
+        && data.memberIds is list
+        && data.memberIds.size() > 0
+        && data.memberIds.size() <= 50
+        && (data.coverPhotoUrl == null
+          || (data.coverPhotoUrl is string && data.coverPhotoUrl.size() <= 500))
+        && data.createdBy is string;
+    }
+
+    match /memoryGroups/{groupId} {
+      allow get, list: if inCircle(resource.data.familyCircleId);
+
+      allow create: if isValidMemoryGroup(request.resource.data)
+        && inCircle(request.resource.data.familyCircleId)
+        && request.resource.data.createdBy == request.auth.uid
+        && request.auth.uid in request.resource.data.memberIds
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      allow update: if isValidMemoryGroup(request.resource.data)
+        && inCircle(resource.data.familyCircleId)
+        && request.resource.data.familyCircleId == resource.data.familyCircleId
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if false;
+    }
+
+    function memoryFields() {
+      return ['familyCircleId', 'memoryGroupId', 'visibility', 'type', 'storageUrl',
+              'thumbnailUrl', 'durationSeconds', 'takenAt', 'uploadedBy', 'caption',
+              'transcript', 'aiStory', 'aiStatus', 'categorizationMethod', 'includeInSlideshow',
+              'createdAt', 'updatedAt'];
+    }
+
+    function isValidMemory(data) {
+      return data.keys().hasOnly(memoryFields())
+        && data.keys().hasAll(memoryFields())
+        && data.familyCircleId is string
+        && data.memoryGroupId is string
+        && data.visibility in ['private', 'shared']
+        && (
+             (data.visibility == 'private' && data.memoryGroupId == 'my-space')
+             || (data.visibility == 'shared' && data.memoryGroupId != 'my-space')
+           )
+        && data.type in ['photo', 'video', 'voice']
+        && data.storageUrl is string
+        && (data.thumbnailUrl == null || data.thumbnailUrl is string)
+        && (data.durationSeconds == null || data.durationSeconds is number)
+        && (data.takenAt == null || data.takenAt is timestamp)
+        && data.uploadedBy is string
+        && (data.caption == null || data.caption is string)
+        && (data.transcript == null || data.transcript is string)
+        && (data.aiStory == null || data.aiStory is string)
+        && data.aiStatus in ['pending', 'success', 'failed', 'offline_fallback', 'not_applicable']
+        && data.categorizationMethod in ['auto', 'manual', 'default']
+        && data.includeInSlideshow is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /memories/{memoryId} {
+      allow get, list: if isSignedIn() 
+        && (
+          (inCircle(resource.data.familyCircleId) && resource.data.visibility == 'shared')
+          || resource.data.uploadedBy == request.auth.uid
+        );
+
+      allow create: if isSignedIn()
+        && isValidMemory(request.resource.data)
+        && inCircle(request.resource.data.familyCircleId)
+        && request.resource.data.uploadedBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        // Clients cannot set AI fields
+        && request.resource.data.aiStory == null
+        && request.resource.data.aiStatus in ['pending', 'not_applicable'];
+
+      allow update: if isSignedIn()
+        && isValidMemory(request.resource.data)
+        && inCircle(resource.data.familyCircleId)
+        && request.resource.data.familyCircleId == resource.data.familyCircleId
+        && request.resource.data.uploadedBy == resource.data.uploadedBy
+        && request.auth.uid == resource.data.uploadedBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time
+        // Clients cannot modify AI fields
+        && request.resource.data.aiStory == resource.data.aiStory
+        && request.resource.data.aiStatus == resource.data.aiStatus;
+
+      allow delete: if false;
     }
 
     match /{document=**} {
