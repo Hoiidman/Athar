@@ -34,6 +34,7 @@ export interface MemoryGroup {
   familyCircleId: string;
   title: string;
   category?: MemoryGroupCategory;
+  icon?: string | null;
   startDate: number;
   endDate: number;
   memberIds: string[];
@@ -44,3 +45,4 @@ export interface MemoryGroup {
 }
 
 export const MY_SPACE_GROUP_ID = 'my-space';
+

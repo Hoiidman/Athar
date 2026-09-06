@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState } from 'react';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { firestore } from '../services/firebase';
@@ -23,7 +24,7 @@ export function useMySpaceMemories(userId: string, circleId: string | null) {
       collection(firestore, 'memories'),
       where('familyCircleId', '==', circleId),
       where('uploadedBy', '==', userId),
-      where('memoryGroupId', '==', 'my-space'),
+      
     );
 
     const unsubscribe = onSnapshot(
@@ -69,3 +70,4 @@ export function useMySpaceMemories(userId: string, circleId: string | null) {
 
   return state;
 }
+

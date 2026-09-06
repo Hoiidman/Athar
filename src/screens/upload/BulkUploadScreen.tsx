@@ -5,6 +5,8 @@ import * as MediaLibrary from 'expo-media-library';
 import type { User } from 'firebase/auth';
 import { matchGroupsByDate } from '../../utils/autoCategorization';
 import { Button } from '../../components/Button';
+import * as VideoThumbnails from 'expo-video-thumbnails';
+import { Ionicons } from '@expo/vector-icons';
 import { Select } from '../../components/Select';
 import { colors, spacing, typography, cardCornerRadius } from '../../theme';
 import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
@@ -21,6 +23,9 @@ export interface CategorizedPhoto {
   width: number;
   height: number;
   creationTimeMs: number | null;
+  type: "photo" | "video";
+  durationSeconds?: number;
+  localThumbnailUri?: string;
   matchedGroupIds: string[];
   selectedGroupId: string;
 }
@@ -64,7 +69,7 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
       const canUseMediaLibrary = status === 'granted';
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
         allowsMultipleSelection: true,
         quality: 1,
         exif: true,
@@ -78,6 +83,17 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
 
       for (const asset of result.assets) {
         let creationTimeMs: number | null = null;
+        const isVideo = asset.type === "video";
+        const durationSeconds = isVideo && asset.duration ? asset.duration / 1000 : undefined;
+        let localThumbnailUri: string | undefined;
+        if (isVideo) {
+          try {
+            const { uri } = await VideoThumbnails.getThumbnailAsync(asset.uri, { time: 50 });
+            localThumbnailUri = uri;
+          } catch (e) {
+            console.warn("Failed to generate local video thumbnail", e);
+          }
+        }
 
         // Try EXIF first (works well on Android with expo-image-picker if exif: true)
         if (asset.exif && asset.exif.DateTimeOriginal) {
@@ -116,6 +132,8 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
           uri: asset.uri,
           width: asset.width,
           height: asset.height,
+          type: isVideo ? "video" : "photo",
+          durationSeconds,
           creationTimeMs,
           matchedGroupIds,
           selectedGroupId,
@@ -146,7 +164,10 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
           </View>
         ) : null}
 
-        <Button label="Select Photos" onPress={handleSelectPhotos} loading={loading} />
+        <View style={{ gap: 12, width: "100%" }}>
+          <Button label="Select Photos" onPress={handleSelectPhotos} loading={loading} />
+          <Button label="Cancel" variant="secondary" onPress={onCancel} disabled={loading} />
+        </View>
       </View>
     );
   }
@@ -166,7 +187,12 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
 
             return (
               <View key={i} style={styles.photoRow}>
-                <Image source={{ uri: photo.uri }} style={styles.thumbnail} />
+                <Image source={{ uri: photo.localThumbnailUri ?? photo.uri }} style={styles.thumbnail} />
+                  {photo.type === "video" && (
+                    <View style={[StyleSheet.absoluteFill, { justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.2)" }]}>
+                      <Ionicons name="play-circle" size={24} color="#fff" />
+                    </View>
+                  )}
                 <View style={styles.photoInfo}>
                   <Text style={styles.photoDate}>
                     {photo.creationTimeMs

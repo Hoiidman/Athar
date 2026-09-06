@@ -18,11 +18,13 @@ import { Select } from '../../components/Select';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
 import { cardCornerRadius, colors, minTapTarget, spacing, typography } from '../../theme';
 import type { User } from 'firebase/auth';
-import { createMemoryGroup } from '../../services/memoryGroups';
+import { createMemoryGroup, updateMemoryGroup } from '../../services/memoryGroups';
+import type { MemoryGroup } from '../../types/memory';
 
 interface CreateMemoryGroupScreenProps {
   user: User;
   circleId: string | null;
+  initialGroup?: MemoryGroup;
   onCancel?: () => void;
   onContinue?: (groupId: string) => void;
 }
@@ -39,17 +41,19 @@ export function CreateMemoryGroupScreen({
   circleId,
   onCancel,
   onContinue,
+  initialGroup,
 }: CreateMemoryGroupScreenProps) {
   const { state: overviewState } = useFamilyCircleOverview(circleId);
 
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(initialGroup?.title ?? '');
   const [titleError, setTitleError] = useState<string>();
-  const [category, setCategory] = useState<string | null>(null);
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date());
+  const [icon, setIcon] = useState<string>(initialGroup?.icon ?? "🎉");
+  const [category, setCategory] = useState<string | null>(initialGroup?.category ?? null);
+  const [startDate, setStartDate] = useState(initialGroup ? new Date(initialGroup.startDate) : new Date());
+  const [endDate, setEndDate] = useState(initialGroup ? new Date(initialGroup.endDate) : new Date());
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
-  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
+  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(initialGroup ? new Set(initialGroup.memberIds) : new Set());
   const [formError, setFormError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
 
@@ -90,18 +94,32 @@ export function CreateMemoryGroupScreen({
 
     setSubmitting(true);
     try {
-      const groupId = await createMemoryGroup(user, circleId, {
-        title: trimmedTitle,
-        category: category ?? undefined,
-        startDate: startDate.getTime(),
-        endDate: endDate.getTime(),
-        memberIds: Array.from(selectedMembers),
-      });
+      let groupId = initialGroup?.id ?? "";
+      if (initialGroup) {
+        await updateMemoryGroup(initialGroup.id, {
+          title: trimmedTitle,
+          category: category ?? undefined,
+          icon,
+          startDate: startDate.getTime(),
+          endDate: endDate.getTime(),
+          memberIds: Array.from(selectedMembers),
+        });
+      } else {
+        groupId = await createMemoryGroup(user, circleId, {
+          title: trimmedTitle,
+          category: category ?? undefined,
+          startDate: startDate.getTime(),
+          endDate: endDate.getTime(),
+          icon,
+          memberIds: Array.from(selectedMembers),
+        });
+      }
+      
       if (onContinue) {
         onContinue(groupId);
       }
     } catch {
-      setFormError('Could not create memory group. Check your connection.');
+      setFormError(initialGroup ? 'Could not update memory group. Check your connection.' : 'Could not create memory group. Check your connection.');
     } finally {
       setSubmitting(false);
     }
@@ -155,9 +173,9 @@ export function CreateMemoryGroupScreen({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>New Memory Group</Text>
+          <Text style={styles.title}>{initialGroup ? "Edit Memory Group" : "New Memory Group"}</Text>
           <Text style={styles.subtitle}>
-            Create a shared space for an event, trip, or time period.
+            {initialGroup ? "Update settings for your shared space." : "Create a shared space for an event, trip, or time period."}
           </Text>
         </View>
 
@@ -167,6 +185,29 @@ export function CreateMemoryGroupScreen({
               <Text style={styles.bannerText}>{formError}</Text>
             </View>
           ) : null}
+
+          
+          <View style={{ marginBottom: 16 }}>
+            <Text style={{ fontSize: 14, fontWeight: '500', color: '#1a1a1a', marginBottom: 8 }}>Icon</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              {['🏠', '🎂', '🎓', '👶', '✈️', '🎉', '💍', '⚽', '🎨', '🌟', '🏆', '🎵'].map(emoji => (
+                <Pressable
+                  key={emoji}
+                  onPress={() => setIcon(emoji)}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: icon === emoji ? '#007AFF' : '#f0f0f0',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Text style={{ fontSize: 20 }}>{emoji}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
 
           <TextInput
             label="Title"
@@ -247,7 +288,7 @@ export function CreateMemoryGroupScreen({
           </View>
 
           <View style={styles.action}>
-            <Button label="Create memory group" onPress={handleSubmit} loading={submitting} />
+            <Button label={initialGroup ? "Save Changes" : "Create memory group"} onPress={handleSubmit} loading={submitting} />
             {onCancel ? (
               <Button label="Cancel" variant="secondary" onPress={onCancel} disabled={submitting} />
             ) : null}

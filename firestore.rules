@@ -236,7 +236,7 @@ service cloud.firestore {
     }
 
     function memoryGroupFields() {
-      return ['familyCircleId', 'title', 'category', 'startDate', 'endDate', 'memberIds',
+      return ['familyCircleId', 'title', 'category', 'icon', 'startDate', 'endDate', 'memberIds',
               'coverPhotoUrl', 'createdBy', 'createdAt', 'updatedAt'];
     }
 
@@ -249,6 +249,7 @@ service cloud.firestore {
         && data.title.size() > 0
         && data.title.size() <= 80
         && (!('category' in data) || data.category in ['vacation', 'event', 'holiday', 'other'])
+        && (!('icon' in data) || (data.icon is string && data.icon.size() <= 10))
         && data.startDate is timestamp
         && data.endDate is timestamp
         && data.startDate <= data.endDate
@@ -342,7 +343,7 @@ service cloud.firestore {
         && request.resource.data.aiStory == resource.data.aiStory
         && request.resource.data.aiStatus == resource.data.aiStatus;
 
-      allow delete: if false;
+      allow delete: if isSignedIn() && inCircle(resource.data.familyCircleId);
     }
 
     match /{document=**} {

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState } from 'react';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { firestore } from '../services/firebase';
@@ -28,6 +29,8 @@ export function useMemoryGroups(circleId: string | null) {
             id: doc.id,
             familyCircleId: data.familyCircleId,
             title: data.title,
+            category: data.category ?? undefined,
+            icon: data.icon ?? null,
             startDate: data.startDate?.toMillis() ?? 0,
             endDate: data.endDate?.toMillis() ?? 0,
             memberIds: data.memberIds ?? [],
@@ -54,3 +57,5 @@ export function useMemoryGroups(circleId: string | null) {
 
   return state;
 }
+
+

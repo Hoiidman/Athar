@@ -18,8 +18,11 @@ export async function uploadBatchedMemories(
   circleId: string,
   photos: {
     uri: string;
+    localThumbnailUri?: string;
     groupId: string; // can be 'my-space'
     takenAtMs: number | null;
+    type: "photo" | "video";
+    durationSeconds?: number;
   }[],
   onProgress: (current: number, total: number) => void,
 ) {
@@ -41,6 +44,20 @@ export async function uploadBatchedMemories(
     await uploadBytes(storageRef, blob);
     const downloadUrl = await getDownloadURL(storageRef);
 
+    let thumbnailUrl: string | null = null;
+    if (photo.type === 'video' && photo.localThumbnailUri) {
+      try {
+        const thumbResponse = await fetch(photo.localThumbnailUri);
+        const thumbBlob = await thumbResponse.blob();
+        const thumbStoragePath = `memories/${user.uid}/thumb_${uniqueId}.jpg`;
+        const thumbStorageRef = ref(storage, thumbStoragePath);
+        await uploadBytes(thumbStorageRef, thumbBlob);
+        thumbnailUrl = await getDownloadURL(thumbStorageRef);
+      } catch (e) {
+        console.warn("Failed to upload video thumbnail", e);
+      }
+    }
+
     // 4. Create the Firestore document
     const isPrivate = photo.groupId === 'my-space';
 
@@ -48,10 +65,10 @@ export async function uploadBatchedMemories(
       familyCircleId: circleId,
       memoryGroupId: photo.groupId,
       visibility: isPrivate ? 'private' : 'shared',
-      type: 'photo',
+      type: photo.type,
       storageUrl: downloadUrl,
-      thumbnailUrl: null,
-      durationSeconds: null,
+      thumbnailUrl: thumbnailUrl,
+      durationSeconds: photo.durationSeconds ?? null,
       takenAt: photo.takenAtMs ? new Date(photo.takenAtMs) : null,
       uploadedBy: user.uid,
       caption: null,
