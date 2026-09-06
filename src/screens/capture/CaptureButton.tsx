@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/refs */
 import { useEffect, useRef } from 'react';
-import { Animated, PanResponder, StyleSheet, View, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, PanResponder, StyleSheet, View, Pressable } from 'react-native';
 import { colors } from '../../theme';
 
 const BUTTON_SIZE = 88;
