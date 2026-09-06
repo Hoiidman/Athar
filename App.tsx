@@ -4,16 +4,20 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { RootTabNavigator } from './src/navigation/RootTabNavigator';
+
 import { AuthNavigator } from './src/navigation/AuthNavigator';
+import { RootStackNavigator } from './src/navigation/RootStackNavigator';
+
 import { Button } from './src/components/Button';
 import { FamilyCircleOnboardingScreen } from './src/screens/familyCircle/FamilyCircleOnboardingScreen';
 import { InviteLinkScreen } from './src/screens/familyCircle/InviteLinkScreen';
+
 import { useAuth } from './src/hooks/useAuth';
 import { useEnsureUserDocument } from './src/hooks/useEnsureUserDocument';
 import { useFamilyCircleMembership } from './src/hooks/useFamilyCircleMembership';
 import { useInviteLinkFlow } from './src/hooks/useInviteLinkFlow';
 import { usePendingInviteCode } from './src/hooks/usePendingInviteCode';
+
 import { colors, spacing, typography } from './src/theme';
 
 function Splash() {
@@ -24,13 +28,24 @@ function Splash() {
   );
 }
 
-function RetryNotice({ message, onRetry }: { message: string; onRetry: () => void }) {
+function RetryNotice({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
   return (
     <View style={[styles.splash, styles.centred]}>
       <Text style={styles.message} accessibilityRole="alert">
         {message}
       </Text>
-      <Button label="Try again" variant="secondary" onPress={onRetry} />
+
+      <Button
+        label="Try again"
+        variant="secondary"
+        onPress={onRetry}
+      />
     </View>
   );
 }
@@ -41,9 +56,14 @@ interface SignedInRoutesProps {
   onInviteUsed: () => void;
 }
 
-function SignedInRoutes({ user, inviteCode, onInviteUsed }: SignedInRoutesProps) {
+function SignedInRoutes({
+  user,
+  inviteCode,
+  onInviteUsed,
+}: SignedInRoutesProps) {
   const userDocument = useEnsureUserDocument(user);
-  const { state, retry, adoptCircle } = useFamilyCircleMembership(user);
+  const { state, retry, adoptCircle } =
+    useFamilyCircleMembership(user);
 
   if (userDocument.failed) {
     return (
@@ -54,7 +74,9 @@ function SignedInRoutes({ user, inviteCode, onInviteUsed }: SignedInRoutesProps)
     );
   }
 
-  if (state.status === 'loading') return <Splash />;
+  if (state.status === 'loading') {
+    return <Splash />;
+  }
 
   if (state.status === 'error') {
     return (
@@ -66,7 +88,7 @@ function SignedInRoutes({ user, inviteCode, onInviteUsed }: SignedInRoutesProps)
   }
 
   if (state.circleId) {
-    return <RootTabNavigator user={user} />;
+    return <RootStackNavigator />;
   }
 
   return (
@@ -83,8 +105,14 @@ function SignedInRoutes({ user, inviteCode, onInviteUsed }: SignedInRoutesProps)
 
 export default function App() {
   const { user, initializing } = useAuth();
+
   const invite = usePendingInviteCode();
-  const link = useInviteLinkFlow(initializing ? null : invite.code, !!user, invite.clear);
+
+  const link = useInviteLinkFlow(
+    initializing ? null : invite.code,
+    !!user,
+    invite.clear
+  );
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -100,11 +128,16 @@ export default function App() {
               onSkip={link.complete}
             />
           ) : user ? (
-            <SignedInRoutes user={user} inviteCode={invite.code} onInviteUsed={invite.clear} />
+            <SignedInRoutes
+              user={user}
+              inviteCode={invite.code}
+              onInviteUsed={invite.clear}
+            />
           ) : (
             <AuthNavigator />
           )}
         </NavigationContainer>
+
         <StatusBar style="auto" />
       </SafeAreaProvider>
     </GestureHandlerRootView>
@@ -118,10 +151,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   centred: {
     paddingHorizontal: spacing.md,
     gap: spacing.sm,
   },
+
   message: {
     ...typography.body,
     color: colors.textSecondary,

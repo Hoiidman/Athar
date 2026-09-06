@@ -1,14 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { CameraView } from 'expo-camera';
-import { useAudioRecorder, RecordingPresets } from 'expo-audio';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../navigation/RootStackNavigator';
 import { useCaptureMediaPermissions } from '../../hooks/useCaptureMediaPermissions';
 import { useCaptureDestinationStore } from '../../store/captureDestinationStore';
+import { useCaptureSessionStore } from '../../store/captureSessionStore';
 import { MY_SPACE_GROUP_ID } from '../../types';
 import { CaptureButton } from './CaptureButton';
 import { AlbumPicker } from './AlbumPicker';
+import { VoiceRecorder } from './VoiceRecorder';
 import { colors, spacing, typography } from '../../theme';
 
 type FlashMode = 'off' | 'on' | 'auto';
@@ -22,19 +27,58 @@ const FLASH_ICONS: Record<FlashMode, React.ComponentProps<typeof Ionicons>['name
 
 const FLASH_CYCLE: FlashMode[] = ['auto', 'on', 'off'];
 
+const ZOOM_SENSITIVITY = 0.18;
+
+// Pixels of vertical drag needed to travel the full zoom range while recording.
+const ZOOM_DRAG_DISTANCE = 220;
+
+function clampZoom(value: number) {
+  return Math.min(Math.max(value, 0), 1);
+}
+
 export function CaptureScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { granted, cameraPermission, requestAll } = useCaptureMediaPermissions();
   const { destinationId } = useCaptureDestinationStore();
+  const items = useCaptureSessionStore((state) => state.items);
+  const addItem = useCaptureSessionStore((state) => state.addItem);
 
   const [facing, setFacing] = useState<Facing>('back');
   const [flash, setFlash] = useState<FlashMode>('auto');
   const [voiceMode, setVoiceMode] = useState(false);
   const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
   const [albumPickerVisible, setAlbumPickerVisible] = useState(false);
-  const [lastCaptureUri, setLastCaptureUri] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [zoom, setZoom] = useState(0);
 
   const cameraRef = useRef<CameraView>(null);
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const shutterOpacity = useRef(new Animated.Value(0)).current;
+  const chromeOpacity = useRef(new Animated.Value(1)).current;
+  const zoomBase = useRef(0);
+  const zoomLive = useRef(0);
+
+  const media = items.filter((item) => item.kind !== 'audio');
+  const lastMedia = media[media.length - 1];
+
+  function applyZoom(next: number) {
+    const clamped = clampZoom(next);
+    zoomLive.current = clamped;
+    setZoom(clamped);
+  }
+
+  const pinchGesture = useMemo(
+    () =>
+      Gesture.Pinch()
+        .onUpdate((e) => applyZoom(zoomBase.current + (e.scale - 1) * ZOOM_SENSITIVITY))
+        .onEnd(() => {
+          zoomBase.current = zoomLive.current;
+        }),
+    [],
+  );
+
+  function handleZoomDrag(dy: number) {
+    applyZoom(zoomBase.current - dy / ZOOM_DRAG_DISTANCE);
+  }
 
   useEffect(() => {
     if (cameraPermission && !cameraPermission.granted && cameraPermission.canAskAgain) {
@@ -48,31 +92,45 @@ export function CaptureScreen() {
   }
 
   async function handleTakePhoto() {
+    Animated.sequence([
+      Animated.timing(shutterOpacity, { toValue: 1, duration: 60, useNativeDriver: true }),
+      Animated.timing(shutterOpacity, { toValue: 0, duration: 240, useNativeDriver: true }),
+    ]).start();
+
     const photo = await cameraRef.current?.takePictureAsync();
-    if (photo) setLastCaptureUri(photo.uri);
+    if (photo) addItem(photo.uri, 'photo');
   }
 
   async function handleStartRecording() {
     setCameraMode('video');
-    setTimeout(async () => {
-      const video = await cameraRef.current?.recordAsync();
-      if (video) setLastCaptureUri(video.uri);
-    }, 150);
+    setIsRecording(true);
+    Animated.timing(chromeOpacity, {
+      toValue: 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+
+    // The camera needs a beat to switch modes before it will accept a
+    // recording, and it has to stay in video mode until the file comes back.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const video = await cameraRef.current?.recordAsync();
+    if (video) addItem(video.uri, 'video');
+    setCameraMode('picture');
   }
 
   function handleStopRecording() {
     cameraRef.current?.stopRecording();
-    setCameraMode('picture');
+    setIsRecording(false);
+    zoomBase.current = zoomLive.current;
+    Animated.timing(chromeOpacity, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
   }
 
-  async function handleVoicePressIn() {
-    await audioRecorder.prepareToRecordAsync();
-    audioRecorder.record();
-  }
-
-  async function handleVoicePressOut() {
-    await audioRecorder.stop();
-    if (audioRecorder.uri) setLastCaptureUri(audioRecorder.uri);
+  function openPreview() {
+    if (lastMedia) navigation.navigate('MediaPreview', { itemId: lastMedia.id });
   }
 
   const albumLabel = destinationId === MY_SPACE_GROUP_ID ? 'My Space' : destinationId;
@@ -93,17 +151,22 @@ export function CaptureScreen() {
   return (
     <View style={styles.container}>
       {voiceMode ? (
-        <View style={styles.voiceBackground}>
-          <Pressable
-            style={styles.voiceMicButton}
-            onPressIn={handleVoicePressIn}
-            onPressOut={handleVoicePressOut}
-          >
-            <Ionicons name="mic" size={52} color={colors.surface} />
-          </Pressable>
-          <Text style={styles.voiceHint}>Hold to record</Text>
-        </View>
+        <VoiceRecorder onRecorded={(uri) => addItem(uri, 'audio')} />
       ) : (
+        <>
+        <GestureDetector gesture={pinchGesture}>
+          <View style={StyleSheet.absoluteFill}>
+            <CameraView
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              facing={facing}
+              flash={flash}
+              mode={cameraMode}
+              zoom={zoom}
+              mirror={facing === 'front'}
+            />
+          </View>
+        </GestureDetector>
         <CameraView
           ref={cameraRef}
           style={StyleSheet.absoluteFill}
@@ -111,54 +174,86 @@ export function CaptureScreen() {
           flash={flash}
           mode={cameraMode}
         />
+        </>
       )}
 
-      <SafeAreaView style={styles.topBar} edges={['top']}>
-        <Pressable onPress={cycleFlash} style={styles.iconButton} hitSlop={10}>
-          <Ionicons name={FLASH_ICONS[flash]} size={24} color={colors.surface} />
-        </Pressable>
-        <Pressable
-          onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}
-          style={styles.iconButton}
-          hitSlop={10}
-        >
-          <Ionicons name="camera-reverse-outline" size={26} color={colors.surface} />
-        </Pressable>
-      </SafeAreaView>
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, styles.shutter, { opacity: shutterOpacity }]}
+      />
 
-      <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
-        <Pressable style={styles.albumButton} onPress={() => setAlbumPickerVisible(true)}>
-          <Ionicons name="albums-outline" size={14} color={colors.surface} />
-          <Text style={styles.albumLabel}>{albumLabel}</Text>
-          <Ionicons name="chevron-down" size={14} color={colors.surface} />
-        </Pressable>
-
-        <View style={styles.captureRow}>
+      {!voiceMode && (
+        <SafeAreaView style={styles.topBar} edges={['top']}>
+          <Pressable onPress={cycleFlash} style={styles.iconButton} hitSlop={10}>
+            <Ionicons name={FLASH_ICONS[flash]} size={30} color={colors.surface} />
+          </Pressable>
           <Pressable
-            onPress={() => setVoiceMode((v) => !v)}
+            onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}
             style={styles.iconButton}
             hitSlop={10}
           >
-            <Ionicons
-              name={voiceMode ? 'mic' : 'mic-outline'}
-              size={28}
-              color={voiceMode ? colors.primary : colors.surface}
+            <Ionicons name="camera-reverse-outline" size={32} color={colors.surface} />
+          </Pressable>
+        </SafeAreaView>
+      )}
+
+      <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
+        <Animated.View
+          style={{ opacity: chromeOpacity }}
+          pointerEvents={isRecording ? 'none' : 'auto'}
+        >
+          <Pressable style={styles.albumButton} onPress={() => setAlbumPickerVisible(true)}>
+            <Ionicons name="albums-outline" size={16} color={colors.surface} />
+            <Text style={styles.albumLabel}>{albumLabel}</Text>
+            <Ionicons name="chevron-down" size={16} color={colors.surface} />
+          </Pressable>
+        </Animated.View>
+
+        <View style={[styles.captureRow, voiceMode && styles.captureRowVoice]}>
+          <Animated.View
+            style={{ opacity: chromeOpacity }}
+            pointerEvents={isRecording ? 'none' : 'auto'}
+          >
+            <Pressable
+              onPress={() => setVoiceMode((v) => !v)}
+              style={styles.iconButton}
+              hitSlop={10}
+            >
+              <Ionicons
+                name={voiceMode ? 'camera-outline' : 'mic-outline'}
+                size={34}
+                color={colors.surface}
+              />
+            </Pressable>
+          </Animated.View>
+
+          {!voiceMode && (
+            <CaptureButton
+              onTakePhoto={handleTakePhoto}
+              onStartRecording={handleStartRecording}
+              onStopRecording={handleStopRecording}
+              onZoomDrag={handleZoomDrag}
             />
-          </Pressable>
+          )}
 
-          <CaptureButton
-            onTakePhoto={handleTakePhoto}
-            onStartRecording={handleStartRecording}
-            onStopRecording={handleStopRecording}
-          />
-
-          <Pressable style={styles.thumbnailButton}>
-            {lastCaptureUri ? (
-              <Image source={{ uri: lastCaptureUri }} style={styles.thumbnail} />
-            ) : (
-              <View style={styles.thumbnailPlaceholder} />
-            )}
-          </Pressable>
+          {!voiceMode && (
+            <Animated.View
+              style={{ opacity: chromeOpacity }}
+              pointerEvents={isRecording ? 'none' : 'auto'}
+            >
+              <Pressable style={styles.thumbnailButton} onPress={openPreview}>
+                {lastMedia?.kind === 'photo' && (
+                  <Image source={{ uri: lastMedia.uri }} style={styles.thumbnail} />
+                )}
+                {lastMedia?.kind === 'video' && (
+                  <View style={[styles.thumbnail, styles.thumbnailVideo]}>
+                    <Ionicons name="play" size={20} color={colors.surface} />
+                  </View>
+                )}
+                {!lastMedia && <View style={styles.thumbnailPlaceholder} />}
+              </Pressable>
+            </Animated.View>
+          )}
         </View>
       </SafeAreaView>
 
@@ -167,7 +262,7 @@ export function CaptureScreen() {
   );
 }
 
-const THUMBNAIL_SIZE = 48;
+const THUMBNAIL_SIZE = 58;
 
 const styles = StyleSheet.create({
   container: {
@@ -197,24 +292,8 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: colors.textOnAccent,
   },
-  voiceBackground: {
-    flex: 1,
-    backgroundColor: '#111',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  voiceMicButton: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  voiceHint: {
-    ...typography.caption,
-    color: colors.textSecondary,
+  shutter: {
+    backgroundColor: colors.surface,
   },
   topBar: {
     position: 'absolute',
@@ -223,7 +302,7 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     paddingTop: spacing.xs,
   },
   bottomBar: {
@@ -232,8 +311,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingBottom: spacing.sm,
+    gap: 8,
+    paddingBottom: 4,
   },
   albumButton: {
     flexDirection: 'row',
@@ -241,7 +320,7 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: 'rgba(0,0,0,0.4)',
     paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 20,
   },
   albumLabel: {
@@ -253,11 +332,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.md,
+  },
+  captureRowVoice: {
+    justifyContent: 'center',
   },
   iconButton: {
-    width: 44,
-    height: 44,
+    width: 52,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -270,6 +352,11 @@ const styles = StyleSheet.create({
   thumbnail: {
     width: THUMBNAIL_SIZE,
     height: THUMBNAIL_SIZE,
+  },
+  thumbnailVideo: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   thumbnailPlaceholder: {
     width: THUMBNAIL_SIZE,
