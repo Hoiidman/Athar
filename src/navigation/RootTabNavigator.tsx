@@ -1,6 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import type { User } from 'firebase/auth';
+import { useAuth } from '../hooks/useAuth';
 import { CaptureScreen } from '../screens/capture/CaptureScreen';
 import { TimelineScreen } from '../screens/timeline/TimelineScreen';
 import { MemoryGroupsNavigator } from './MemoryGroupsNavigator';
@@ -16,7 +17,9 @@ export type RootTabParamList = {
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
-export function RootTabNavigator({ user }: { user: User }) {
+export function RootTabNavigator() {
+  const { user } = useAuth();
+  if (!user) return null;
   return (
     <Tab.Navigator
       initialRouteName="Capture"

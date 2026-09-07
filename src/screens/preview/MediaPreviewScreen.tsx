@@ -943,7 +943,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   },
   discardLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#000',
     alignItems: 'center',
     paddingTop: 90,
@@ -957,7 +957,7 @@ const styles = StyleSheet.create({
     color: colors.surface,
   },
   stageWrapper: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   stage: {
     flex: 1,
@@ -1120,13 +1120,13 @@ const styles = StyleSheet.create({
     borderColor: colors.surface,
   },
   tileImage: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   tileFallback: {
     backgroundColor: '#3A3A3A',
   },
   tileWash: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   panel: {
     backgroundColor: 'rgba(0,0,0,0.55)',
