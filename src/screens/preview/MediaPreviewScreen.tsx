@@ -25,6 +25,9 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootStackNavigator';
 import { CaptureItem, useCaptureSessionStore } from '../../store/captureSessionStore';
 import { useCaptureDestinationStore } from '../../store/captureDestinationStore';
+import { useAuth } from '../../hooks/useAuth';
+import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
+import { uploadBatchedMemories } from '../../services/memories';
 import { MY_SPACE_GROUP_ID } from '../../types';
 import { AlbumPicker } from '../capture/AlbumPicker';
 import { clampOverlayScale, DraggableItem, DragPosition } from './DraggableItem';
@@ -484,6 +487,8 @@ function SoundsPanel() {
 type Props = NativeStackScreenProps<RootStackParamList, 'MediaPreview'>;
 
 export function MediaPreviewScreen({ route, navigation }: Props) {
+  const { user } = useAuth();
+  const { state: membership } = useFamilyCircleMembership(user!);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const keyboardOffset = useKeyboardOffset();
@@ -680,25 +685,45 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   }
 
   async function flatten() {
+    if (!selected) return '';
     // view-shot cannot pull a frame out of a video, so its own file is the
     // only sensible thing to hand on.
-    if (selected?.kind === 'video') return selected.uri;
+    if (selected.kind === 'video') return selected.uri;
+    if (!edited) return selected.uri;
     return captureRef(stageRef, { format: 'jpg', quality: 0.95 });
   }
 
   async function handleSave() {
-    if (busy) return;
+    if (busy || !user || membership.status !== 'ready' || !membership.circleId || !selected) return;
     setBusy(true);
     try {
-      const permission = await MediaLibrary.requestPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Permission needed', 'Athar needs photo library access to save this.');
-        return;
+      const finalUri = await flatten();
+      const type = selected.kind === 'video' ? 'video' : 'photo';
+      
+      await uploadBatchedMemories(
+        user,
+        membership.circleId,
+        [{
+          uri: finalUri,
+          groupId: destinationId,
+          takenAtMs: Date.now(),
+          type,
+        }],
+        () => {}
+      );
+      
+      removeItem(selected.id);
+      
+      if (items.length <= 1) {
+        navigation.goBack();
+      } else {
+        const index = ordered.findIndex((o) => o.id === selected.id);
+        const fallback = ordered[index + 1] ?? ordered[index - 1];
+        if (fallback) setSelectedId(fallback.id);
       }
-      await MediaLibrary.saveToLibraryAsync(await flatten());
-      Alert.alert('Saved', 'Added to your photo library.');
-    } catch {
-      Alert.alert('Could not save', 'Something went wrong writing the file.');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Upload Failed', 'Could not upload memory.');
     } finally {
       setBusy(false);
     }
@@ -750,7 +775,7 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   const dismissable =
     activeTool === 'filters' || activeTool === 'sounds' || activeTool === 'stickers';
   const albumLabel = destinationId === MY_SPACE_GROUP_ID ? 'My Space' : destinationId;
-  const showActions = edited && activeTool === null;
+  const showActions = activeTool === null;
 
   return (
     <View style={styles.container}>
@@ -912,7 +937,11 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
 
         {activeTool === null && <ToolRail onSelect={setActiveTool} />}
 
-        {showActions ? (
+        {activeTool === null && ordered.length > 1 && (
+          <Carousel items={ordered} selectedId={selected.id} onSelect={setSelectedId} />
+        )}
+
+        {showActions && (
           <Actions
             albumLabel={albumLabel}
             busy={busy}
@@ -920,11 +949,6 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
             onSave={handleSave}
             onPickAlbum={() => setAlbumPickerVisible(true)}
           />
-        ) : (
-          activeTool === null &&
-          ordered.length > 1 && (
-            <Carousel items={ordered} selectedId={selected.id} onSelect={setSelectedId} />
-          )
         )}
       </View>
 

@@ -167,13 +167,7 @@ export function CaptureScreen() {
             />
           </View>
         </GestureDetector>
-        <CameraView
-          ref={cameraRef}
-          style={StyleSheet.absoluteFill}
-          facing={facing}
-          flash={flash}
-          mode={cameraMode}
-        />
+        
         </>
       )}
 
