@@ -1,21 +1,37 @@
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useCaptureDestinationStore } from '../../store/captureDestinationStore';
+import { useAuth } from '../../hooks/useAuth';
+import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
+import { useMemoryGroups } from '../../hooks/useMemoryGroups';
 import { MY_SPACE_GROUP_ID } from '../../types';
 import { colors, spacing, typography } from '../../theme';
-
-const ALBUMS = [{ id: MY_SPACE_GROUP_ID, label: 'My Space' }];
 
 const SHEET_OFFSET = 320;
 
 interface Props {
   visible: boolean;
   onClose: () => void;
+  /** Currently selected destination/group id, checkmarked in the list. */
+  selectedId: string;
+  onSelect: (id: string, label: string) => void;
+  /** Sheet heading — defaults to "Save to". */
+  title?: string;
 }
 
-export function AlbumPicker({ visible, onClose }: Props) {
-  const { destinationId, setDestination } = useCaptureDestinationStore();
+export function AlbumPicker({ visible, onClose, selectedId, onSelect, title = 'Save to' }: Props) {
+  const { user } = useAuth();
+  const { state: membership } = useFamilyCircleMembership(user);
+  const circleId = membership.status === 'ready' ? membership.circleId : null;
+  const groupsState = useMemoryGroups(circleId);
+
+  const albums = useMemo(() => {
+    const groups = groupsState.status === 'ready' ? groupsState.groups : [];
+    return [
+      { id: MY_SPACE_GROUP_ID, label: 'My Space' },
+      ...groups.map((group) => ({ id: group.id, label: group.title })),
+    ];
+  }, [groupsState]);
 
   // Kept separate from `visible` so the sheet can animate out before the
   // modal is actually torn down.
@@ -54,8 +70,8 @@ export function AlbumPicker({ visible, onClose }: Props) {
     });
   }, [visible, backdropOpacity, sheetOffset]);
 
-  function select(id: string) {
-    setDestination(id);
+  function select(id: string, label: string) {
+    onSelect(id, label);
     onClose();
   }
 
@@ -68,15 +84,22 @@ export function AlbumPicker({ visible, onClose }: Props) {
 
         <Animated.View style={[styles.sheet, { transform: [{ translateY: sheetOffset }] }]}>
           <View style={styles.grabber} />
-          <Text style={styles.title}>Save to</Text>
-          {ALBUMS.map((album) => (
-            <Pressable key={album.id} style={styles.row} onPress={() => select(album.id)}>
+          <Text style={styles.title}>{title}</Text>
+          {albums.map((album) => (
+            <Pressable
+              key={album.id}
+              style={styles.row}
+              onPress={() => select(album.id, album.label)}
+            >
               <Text style={styles.label}>{album.label}</Text>
-              {destinationId === album.id && (
+              {selectedId === album.id && (
                 <Ionicons name="checkmark" size={20} color={colors.primary} />
               )}
             </Pressable>
           ))}
+          {groupsState.status === 'loading' && circleId && (
+            <ActivityIndicator style={styles.loading} color={colors.primary} />
+          )}
         </Animated.View>
       </View>
     </Modal>
@@ -125,5 +148,8 @@ const styles = StyleSheet.create({
   label: {
     ...typography.body,
     color: colors.textPrimary,
+  },
+  loading: {
+    marginTop: spacing.xs,
   },
 });
