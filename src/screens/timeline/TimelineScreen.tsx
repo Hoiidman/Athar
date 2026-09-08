@@ -82,6 +82,7 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
   // Bulk Upload State
   const [uploadMode, setUploadMode] = useState<'idle' | 'selecting' | 'uploading' | 'done'>('idle');
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+  const [uploadResult, setUploadResult] = useState({ uploaded: 0, failed: 0 });
 
   // Pop animation: trigger LayoutAnimation when memory count changes
   const prevCountRef = useRef(0);
@@ -153,23 +154,26 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
     setUploadProgress({ current: 0, total: photos.length });
 
     try {
-      await uploadBatchedMemories(
+      const result = await uploadBatchedMemories(
         user,
         circleId,
         photos.map((p) => ({
           uri: p.uri,
+          localThumbnailUri: p.localThumbnailUri,
           groupId: p.selectedGroupId,
           takenAtMs: p.creationTimeMs,
-            type: p.type,
-            durationSeconds: p.durationSeconds,
-          })),
+          type: p.type,
+          durationSeconds: p.durationSeconds,
+        })),
         (current, total) => setUploadProgress({ current, total }),
       );
+      setUploadResult(result);
       setUploadMode('done');
-      // Auto-dismiss after 2 seconds
-      setTimeout(() => setUploadMode('idle'), 2000);
+      // Give failures a beat longer to be read than a clean run needs.
+      setTimeout(() => setUploadMode('idle'), result.failed > 0 ? 4000 : 2000);
     } catch (e) {
       console.error('Upload failed', e);
+      Alert.alert('Upload failed', 'Your memories could not be uploaded. Please try again.');
       setUploadMode('idle');
     }
   }
@@ -332,10 +336,17 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
       <Modal visible={uploadMode === 'uploading' || uploadMode === 'done'} animationType="fade">
         {uploadMode === 'done' ? (
           <View style={[styles.screen, styles.centered]}>
-            <Ionicons name="checkmark-circle" size={64} color={colors.success} />
-            <Text style={styles.successTitle}>Upload Complete!</Text>
+            <Ionicons
+              name={uploadResult.failed > 0 ? 'alert-circle' : 'checkmark-circle'}
+              size={64}
+              color={uploadResult.failed > 0 ? colors.error : colors.success}
+            />
+            <Text style={styles.successTitle}>
+              {uploadResult.failed > 0 ? 'Partially Uploaded' : 'Upload Complete!'}
+            </Text>
             <Text style={styles.successSubtitle}>
-              {uploadProgress.total} {uploadProgress.total === 1 ? 'memory' : 'memories'} added
+              {uploadResult.uploaded} {uploadResult.uploaded === 1 ? 'memory' : 'memories'} added
+              {uploadResult.failed > 0 ? ` · ${uploadResult.failed} failed` : ''}
             </Text>
           </View>
         ) : (
