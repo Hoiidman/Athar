@@ -1,6 +1,7 @@
-import { doc, updateDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { User } from 'firebase/auth';
+import { MY_SPACE_GROUP_ID } from '../types';
 import { firestore, storage } from './firebase';
 
 export async function moveMemoryToGroup(memoryId: string, targetGroupId: string) {
@@ -8,9 +9,13 @@ export async function moveMemoryToGroup(memoryId: string, targetGroupId: string)
 
   await updateDoc(memoryRef, {
     memoryGroupId: targetGroupId,
-    visibility: 'shared',
+    visibility: targetGroupId === MY_SPACE_GROUP_ID ? 'private' : 'shared',
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function deleteMemory(memoryId: string) {
+  await deleteDoc(doc(firestore, 'memories', memoryId));
 }
 
 export async function uploadBatchedMemories(

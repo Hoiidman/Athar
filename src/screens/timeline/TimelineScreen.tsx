@@ -3,10 +3,11 @@ import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   FlatList,
-  
+
   LayoutAnimation,
   Modal,
   Platform,
@@ -23,7 +24,7 @@ import { useMySpaceMemories } from '../../hooks/useMySpaceMemories';
 import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
 import { useMemoryGroups } from '../../hooks/useMemoryGroups';
-import { moveMemoryToGroup, uploadBatchedMemories } from '../../services/memories';
+import { deleteMemory, moveMemoryToGroup, uploadBatchedMemories } from '../../services/memories';
 import type { Memory } from '../../types/memory';
 import { colors, spacing, typography } from '../../theme';
 import { BulkUploadScreen, type CategorizedPhoto } from '../upload/BulkUploadScreen';
@@ -51,11 +52,12 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
   const groupsState = useMemoryGroups(circleId);
   const memoriesState = useMySpaceMemories(user.uid, circleId);
 
-  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
+  const [moveModalVisible, setMoveModalVisible] = useState(false);
   const [viewingMemory, setViewingMemory] = useState<Memory | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   function toggleSelection(id: string) {
     const next = new Set(selectedIds);
@@ -63,6 +65,11 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
     else next.add(id);
     if (next.size === 0) setSelectionMode(false);
     setSelectedIds(next);
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+    setSelectionMode(false);
   }
 
   const onRefresh = () => {
@@ -98,16 +105,46 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
   }
 
   async function handleMove(groupId: string) {
-    if (!selectedMemory) return;
+    if (selectedIds.size === 0) return;
     setMoving(true);
     try {
-      await moveMemoryToGroup(selectedMemory.id, groupId);
-      setSelectedMemory(null);
+      await Promise.all([...selectedIds].map((id) => moveMemoryToGroup(id, groupId)));
+      setMoveModalVisible(false);
+      clearSelection();
     } catch (e) {
-      console.error('Failed to move memory:', e);
+      console.error('Failed to move memories:', e);
+      Alert.alert('Error', 'Failed to move the selected memories.');
     } finally {
       setMoving(false);
     }
+  }
+
+  function handleDelete() {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    Alert.alert(
+      'Delete Memory',
+      `Delete ${count} ${count === 1 ? 'memory' : 'memories'}? This can't be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await Promise.all([...selectedIds].map((id) => deleteMemory(id)));
+              clearSelection();
+            } catch (e) {
+              console.error('Failed to delete memories:', e);
+              Alert.alert('Error', 'Failed to delete the selected memories.');
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
   }
 
   async function handleStartUpload(photos: CategorizedPhoto[]) {
@@ -236,21 +273,53 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
         initialMemoryId={viewingMemory?.id ?? null}
         onClose={() => setViewingMemory(null)}
         showDetails={false}
+        showMoveControl
+        groups={groups}
       />
 
-      <Animated.View style={[styles.fab, { transform: [{ scale: fabScale }] }]}>
-        <Pressable
-          style={styles.fabInner}
-          onPress={() => {
-            animateFab();
-            setUploadMode('selecting');
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Bulk Upload Photos"
-        >
-          <Ionicons name="images" size={24} color={colors.textOnAccent} />
-        </Pressable>
-      </Animated.View>
+      {selectionMode && selectedIds.size > 0 && (
+        <View style={styles.selectionBar}>
+          <Pressable onPress={clearSelection} style={styles.selectionBarButton} hitSlop={8}>
+            <Ionicons name="close" size={22} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={styles.selectionCount}>{selectedIds.size} selected</Text>
+          <View style={styles.selectionActions}>
+            <Pressable
+              onPress={() => setMoveModalVisible(true)}
+              style={styles.selectionBarButton}
+              disabled={deleting}
+              hitSlop={8}
+            >
+              <Ionicons name="albums-outline" size={22} color={colors.textPrimary} />
+              <Text style={styles.selectionBarButtonLabel}>Move</Text>
+            </Pressable>
+            <Pressable onPress={handleDelete} style={styles.selectionBarButton} disabled={deleting} hitSlop={8}>
+              {deleting ? (
+                <ActivityIndicator color={colors.error} />
+              ) : (
+                <Ionicons name="trash-outline" size={22} color={colors.error} />
+              )}
+              <Text style={[styles.selectionBarButtonLabel, { color: colors.error }]}>Delete</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {!(selectionMode && selectedIds.size > 0) && (
+        <Animated.View style={[styles.fab, { transform: [{ scale: fabScale }] }]}>
+          <Pressable
+            style={styles.fabInner}
+            onPress={() => {
+              animateFab();
+              setUploadMode('selecting');
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Bulk Upload Photos"
+          >
+            <Ionicons name="images" size={24} color={colors.textOnAccent} />
+          </Pressable>
+        </Animated.View>
+      )}
 
       <Modal visible={uploadMode === 'selecting'} animationType="slide">
         <BulkUploadScreen
@@ -275,16 +344,16 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
       </Modal>
 
       <Modal
-        visible={!!selectedMemory}
+        visible={moveModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setSelectedMemory(null)}
+        onRequestClose={() => setMoveModalVisible(false)}
       >
-        <Pressable style={styles.modalBackdrop} onPress={() => setSelectedMemory(null)} />
+        <Pressable style={styles.modalBackdrop} onPress={() => setMoveModalVisible(false)} />
         <View style={styles.modalSheet}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Move to Memory Group</Text>
-            <Pressable onPress={() => setSelectedMemory(null)} style={styles.closeButton}>
+            <Pressable onPress={() => setMoveModalVisible(false)} style={styles.closeButton}>
               <Ionicons name="close" size={24} color={colors.textPrimary} />
             </Pressable>
           </View>
@@ -424,6 +493,41 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textPrimary,
     flex: 1,
+  },
+  selectionBar: {
+    position: 'absolute',
+    left: spacing.md,
+    right: spacing.md,
+    bottom: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+  },
+  selectionCount: {
+    ...typography.body,
+    color: colors.textPrimary,
+    flex: 1,
+    marginLeft: spacing.sm,
+  },
+  selectionActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  selectionBarButton: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  selectionBarButtonLabel: {
+    ...typography.label,
+    color: colors.textPrimary,
   },
   fab: {
     position: 'absolute',
