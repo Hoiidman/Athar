@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
+// The date fallback still needs the function-based API; the root export throws for it in SDK 57.
+import * as MediaLibraryLegacy from 'expo-media-library/legacy';
 import type { User } from 'firebase/auth';
 import { matchGroupsByDate } from '../../utils/autoCategorization';
 import { Button } from '../../components/Button';
@@ -37,6 +39,7 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
 
   const [photos, setPhotos] = useState<CategorizedPhoto[]>([]);
   const [loading, setLoading] = useState(false);
+  const [processed, setProcessed] = useState({ current: 0, total: 0 });
   const [error, setError] = useState<string>();
 
   // Optional state for tracking which photo we are manually re-assigning
@@ -63,13 +66,18 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
     setError(undefined);
     try {
       // We request MediaLibrary permissions for iOS date fallback.
-      // If it fails (e.g. Android Expo Go restriction), we don't block the user, 
+      // If it fails (e.g. Android Expo Go restriction), we don't block the user,
       // because Android successfully provides EXIF dates via the image picker anyway.
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      const canUseMediaLibrary = status === 'granted';
+      let canUseMediaLibrary = false;
+      try {
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        canUseMediaLibrary = status === 'granted';
+      } catch (e) {
+        console.warn('Media library permission unavailable', e);
+      }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        mediaTypes: ['images', 'videos'],
         allowsMultipleSelection: true,
         quality: 1,
         exif: true,
@@ -78,6 +86,7 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
       if (result.canceled || !result.assets) return;
 
       setLoading(true);
+      setProcessed({ current: 0, total: result.assets.length });
 
       const processedPhotos: CategorizedPhoto[] = [];
 
@@ -112,11 +121,16 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
           }
         }
 
-        // Fallback to media library if assetId is present (iOS)
+        // Fallback to media library if assetId is present (iOS). A failure here only
+        // costs us auto-categorisation, so it must not abort the whole selection.
         if (!creationTimeMs && asset.assetId != null && canUseMediaLibrary) {
-          const mediaAsset = await MediaLibrary.getAssetInfoAsync(asset.assetId);
-          if (mediaAsset && mediaAsset.creationTime) {
-            creationTimeMs = mediaAsset.creationTime;
+          try {
+            const mediaAsset = await MediaLibraryLegacy.getAssetInfoAsync(asset.assetId);
+            if (mediaAsset && mediaAsset.creationTime) {
+              creationTimeMs = mediaAsset.creationTime;
+            }
+          } catch (e) {
+            console.warn('Could not read creation time from the media library', e);
           }
         }
 
@@ -134,10 +148,13 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
           height: asset.height,
           type: isVideo ? "video" : "photo",
           durationSeconds,
+          localThumbnailUri,
           creationTimeMs,
           matchedGroupIds,
           selectedGroupId,
         });
+
+        setProcessed({ current: processedPhotos.length, total: result.assets.length });
       }
 
       setPhotos(processedPhotos);
@@ -147,6 +164,20 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
     } finally {
       setLoading(false);
     }
+  }
+
+  function renderProcessing() {
+    return (
+      <View style={styles.emptyState}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.emptyTitle}>Preparing…</Text>
+        <Text style={styles.emptySubtitle}>
+          {processed.total > 0
+            ? `Reading ${processed.current} of ${processed.total} items`
+            : 'Reading your selection'}
+        </Text>
+      </View>
+    );
   }
 
   function renderEmpty() {
@@ -177,9 +208,17 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
     // or just let them accept the defaults (first match).
     return (
       <View style={styles.listContainer}>
-        <Text style={styles.title}>Review & Categorize</Text>
-        <ScrollView style={styles.scroll}>
-          {photos.map((photo, i) => {
+        <Text style={styles.title}>
+          Review & Categorize ({photos.length})
+        </Text>
+        <FlatList
+          style={styles.scroll}
+          data={photos}
+          keyExtractor={(_, i) => String(i)}
+          initialNumToRender={12}
+          windowSize={7}
+          removeClippedSubviews
+          renderItem={({ item: photo, index: i }) => {
             const groupName =
               groupOptions.find((g) => g.value === photo.selectedGroupId)?.label ??
               'My Space (Private)';
@@ -221,8 +260,8 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
                 </View>
               </View>
             );
-          })}
-        </ScrollView>
+          }}
+        />
         <View style={styles.actions}>
           <Button label="Upload All" onPress={() => onUpload(photos)} />
           <Button label="Cancel" variant="secondary" onPress={onCancel} />
@@ -231,7 +270,11 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
     );
   }
 
-  return <View style={styles.screen}>{photos.length === 0 ? renderEmpty() : renderList()}</View>;
+  return (
+    <View style={styles.screen}>
+      {loading ? renderProcessing() : photos.length === 0 ? renderEmpty() : renderList()}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

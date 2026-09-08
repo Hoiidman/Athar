@@ -3,10 +3,12 @@ import { MY_SPACE_GROUP_ID } from '../types';
 
 interface CaptureDestinationState {
   destinationId: string;
-  setDestination: (destinationId: string) => void;
+  destinationLabel: string;
+  setDestination: (destinationId: string, destinationLabel: string) => void;
 }
 
 export const useCaptureDestinationStore = create<CaptureDestinationState>((set) => ({
   destinationId: MY_SPACE_GROUP_ID,
-  setDestination: (destinationId) => set({ destinationId }),
+  destinationLabel: 'My Space',
+  setDestination: (destinationId, destinationLabel) => set({ destinationId, destinationLabel }),
 }));

@@ -10,7 +10,6 @@ import type { RootStackParamList } from '../../navigation/RootStackNavigator';
 import { useCaptureMediaPermissions } from '../../hooks/useCaptureMediaPermissions';
 import { useCaptureDestinationStore } from '../../store/captureDestinationStore';
 import { useCaptureSessionStore } from '../../store/captureSessionStore';
-import { MY_SPACE_GROUP_ID } from '../../types';
 import { CaptureButton } from './CaptureButton';
 import { AlbumPicker } from './AlbumPicker';
 import { VoiceRecorder } from './VoiceRecorder';
@@ -39,7 +38,7 @@ function clampZoom(value: number) {
 export function CaptureScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { granted, cameraPermission, requestAll } = useCaptureMediaPermissions();
-  const { destinationId } = useCaptureDestinationStore();
+  const { destinationId, destinationLabel, setDestination } = useCaptureDestinationStore();
   const items = useCaptureSessionStore((state) => state.items);
   const addItem = useCaptureSessionStore((state) => state.addItem);
 
@@ -133,8 +132,6 @@ export function CaptureScreen() {
     if (lastMedia) navigation.navigate('MediaPreview', { itemId: lastMedia.id });
   }
 
-  const albumLabel = destinationId === MY_SPACE_GROUP_ID ? 'My Space' : destinationId;
-
   if (!granted) {
     return (
       <View style={styles.permissionScreen}>
@@ -198,7 +195,7 @@ export function CaptureScreen() {
         >
           <Pressable style={styles.albumButton} onPress={() => setAlbumPickerVisible(true)}>
             <Ionicons name="albums-outline" size={16} color={colors.surface} />
-            <Text style={styles.albumLabel}>{albumLabel}</Text>
+            <Text style={styles.albumLabel}>{destinationLabel}</Text>
             <Ionicons name="chevron-down" size={16} color={colors.surface} />
           </Pressable>
         </Animated.View>
@@ -251,7 +248,12 @@ export function CaptureScreen() {
         </View>
       </SafeAreaView>
 
-      <AlbumPicker visible={albumPickerVisible} onClose={() => setAlbumPickerVisible(false)} />
+      <AlbumPicker
+        visible={albumPickerVisible}
+        onClose={() => setAlbumPickerVisible(false)}
+        selectedId={destinationId}
+        onSelect={setDestination}
+      />
     </View>
   );
 }

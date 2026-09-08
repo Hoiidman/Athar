@@ -1,9 +1,10 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { RootTabNavigator } from './RootTabNavigator';
+import { RootTabNavigator, type RootTabParamList } from './RootTabNavigator';
 import { MediaPreviewScreen } from '../screens/preview/MediaPreviewScreen';
 
 export type RootStackParamList = {
-  Tabs: undefined;
+  Tabs: NavigatorScreenParams<RootTabParamList> | undefined;
   MediaPreview: { itemId: string };
 };
 

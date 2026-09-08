@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Image,
@@ -28,7 +29,6 @@ import { useCaptureDestinationStore } from '../../store/captureDestinationStore'
 import { useAuth } from '../../hooks/useAuth';
 import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
 import { uploadBatchedMemories } from '../../services/memories';
-import { MY_SPACE_GROUP_ID } from '../../types';
 import { AlbumPicker } from '../capture/AlbumPicker';
 import { clampOverlayScale, DraggableItem, DragPosition } from './DraggableItem';
 import { DrawCanvas, Stroke } from './DrawCanvas';
@@ -321,13 +321,14 @@ function Carousel({ items, selectedId, onSelect }: CarouselProps) {
 interface ActionsProps {
   albumLabel: string;
   busy: boolean;
+  saving: boolean;
   onShare: () => void;
   onSave: () => void;
   /** Long pressing save is how the destination space gets changed. */
   onPickAlbum: () => void;
 }
 
-function Actions({ albumLabel, busy, onShare, onSave, onPickAlbum }: ActionsProps) {
+function Actions({ albumLabel, busy, saving, onShare, onSave, onPickAlbum }: ActionsProps) {
   return (
     <View style={styles.actions}>
       <Pressable style={[styles.action, styles.actionSecondary]} onPress={onShare} disabled={busy}>
@@ -341,10 +342,16 @@ function Actions({ albumLabel, busy, onShare, onSave, onPickAlbum }: ActionsProp
         onLongPress={onPickAlbum}
         disabled={busy}
       >
-        <Ionicons name="checkmark" size={20} color={colors.textOnAccent} />
-        <Text style={[styles.actionText, styles.actionTextPrimary]} numberOfLines={1}>
-          Save to {albumLabel}
-        </Text>
+        {saving ? (
+          <ActivityIndicator color={colors.textOnAccent} />
+        ) : (
+          <>
+            <Ionicons name="checkmark" size={20} color={colors.textOnAccent} />
+            <Text style={[styles.actionText, styles.actionTextPrimary]} numberOfLines={1}>
+              Save to {albumLabel}
+            </Text>
+          </>
+        )}
       </Pressable>
     </View>
   );
@@ -495,7 +502,7 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
 
   const items = useCaptureSessionStore((state) => state.items);
   const removeItem = useCaptureSessionStore((state) => state.removeItem);
-  const { destinationId } = useCaptureDestinationStore();
+  const { destinationId, destinationLabel, setDestination } = useCaptureDestinationStore();
 
   // Newest first, so the shot you just took reads as 1 of 3.
   const ordered = useMemo(() => items.filter((item) => item.kind !== 'audio').reverse(), [items]);
@@ -508,6 +515,7 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   const [draggingOverlay, setDraggingOverlay] = useState(false);
   const [overDelete, setOverDelete] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const index = Math.max(
     0,
@@ -696,10 +704,11 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   async function handleSave() {
     if (busy || !user || membership.status !== 'ready' || !membership.circleId || !selected) return;
     setBusy(true);
+    setSaving(true);
     try {
       const finalUri = await flatten();
       const type = selected.kind === 'video' ? 'video' : 'photo';
-      
+
       await uploadBatchedMemories(
         user,
         membership.circleId,
@@ -711,11 +720,11 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
         }],
         () => {}
       );
-      
+
       removeItem(selected.id);
-      
+
       if (items.length <= 1) {
-        navigation.goBack();
+        navigation.navigate('Tabs', { screen: 'Timeline' });
       } else {
         const index = ordered.findIndex((o) => o.id === selected.id);
         const fallback = ordered[index + 1] ?? ordered[index - 1];
@@ -726,6 +735,7 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
       Alert.alert('Upload Failed', 'Could not upload memory.');
     } finally {
       setBusy(false);
+      setSaving(false);
     }
   }
 
@@ -774,7 +784,7 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   const filter = FILTERS.find((option) => option.id === current.filter) ?? FILTERS[0];
   const dismissable =
     activeTool === 'filters' || activeTool === 'sounds' || activeTool === 'stickers';
-  const albumLabel = destinationId === MY_SPACE_GROUP_ID ? 'My Space' : destinationId;
+  const albumLabel = destinationLabel;
   const showActions = activeTool === null;
 
   return (
@@ -945,6 +955,7 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
           <Actions
             albumLabel={albumLabel}
             busy={busy}
+            saving={saving}
             onShare={handleShare}
             onSave={handleSave}
             onPickAlbum={() => setAlbumPickerVisible(true)}
@@ -952,7 +963,12 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
         )}
       </View>
 
-      <AlbumPicker visible={albumPickerVisible} onClose={() => setAlbumPickerVisible(false)} />
+      <AlbumPicker
+        visible={albumPickerVisible}
+        onClose={() => setAlbumPickerVisible(false)}
+        selectedId={destinationId}
+        onSelect={setDestination}
+      />
     </View>
   );
 }

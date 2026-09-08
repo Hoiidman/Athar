@@ -4,10 +4,13 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { Modal, View, Text,  StyleSheet, Pressable, ActivityIndicator, Alert, Dimensions, FlatList } from 'react-native';
 import { useRef } from "react";
 import { Ionicons } from '@expo/vector-icons';
-import { Memory } from '../types/memory';
+import { Memory, MemoryGroup } from '../types/memory';
+import { MY_SPACE_GROUP_ID } from '../types';
 import { colors, spacing, typography } from '../theme';
 import { deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { firestore } from '../services/firebase';
+import { moveMemoryToGroup } from '../services/memories';
+import { AlbumPicker } from '../screens/capture/AlbumPicker';
 
 
 function VideoItem({ uri }: { uri: string }) {
@@ -33,11 +36,24 @@ interface ImageViewerModalProps {
   onClose: () => void;
   showDetails?: boolean;
   getUploaderName?: (uid: string) => string;
+  /** Shows a "Move to <space>" control instead of editing tools. Used from the Timeline. */
+  showMoveControl?: boolean;
+  groups?: MemoryGroup[];
 }
 
-export function ImageViewerModal({ memories, initialMemoryId, onClose, showDetails = false, getUploaderName }: ImageViewerModalProps) {
+export function ImageViewerModal({
+  memories,
+  initialMemoryId,
+  onClose,
+  showDetails = false,
+  getUploaderName,
+  showMoveControl = false,
+  groups = [],
+}: ImageViewerModalProps) {
   const [removing, setRemoving] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(-1);
+  const [movePickerVisible, setMovePickerVisible] = useState(false);
+  const [moving, setMoving] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -91,11 +107,28 @@ export function ImageViewerModal({ memories, initialMemoryId, onClose, showDetai
 
 
 
+  async function handleMoveTo(groupId: string) {
+    setMoving(true);
+    try {
+      await moveMemoryToGroup(memory.id, groupId);
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to move memory');
+    } finally {
+      setMoving(false);
+    }
+  }
+
   const uploadDate = new Date(memory.createdAt).toLocaleDateString();
   const takenDate = memory.takenAt ? new Date(memory.takenAt).toLocaleDateString() : 'Unknown';
   const uploaderName = getUploaderName ? getUploaderName(memory.uploadedBy) : memory.uploadedBy;
+  const currentGroupLabel =
+    memory.memoryGroupId === MY_SPACE_GROUP_ID
+      ? 'My Space'
+      : groups.find((g) => g.id === memory.memoryGroupId)?.title ?? 'Shared';
 
   return (
+    <>
     <Modal visible={true} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.container}>
         <View style={styles.header}>
@@ -146,8 +179,41 @@ export function ImageViewerModal({ memories, initialMemoryId, onClose, showDetai
             <Text style={styles.detailText}>Taken on: {takenDate}</Text>
           </View>
         )}
+
+        {showMoveControl && (
+          <View style={styles.moveBar}>
+            <Pressable
+              style={styles.moveButton}
+              onPress={() => setMovePickerVisible(true)}
+              disabled={moving}
+            >
+              {moving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="albums-outline" size={18} color="#fff" />
+                  <Text style={styles.moveButtonText} numberOfLines={1}>
+                    Move to {currentGroupLabel}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color="#fff" />
+                </>
+              )}
+            </Pressable>
+          </View>
+        )}
       </View>
     </Modal>
+
+    {showMoveControl && (
+      <AlbumPicker
+        visible={movePickerVisible}
+        onClose={() => setMovePickerVisible(false)}
+        selectedId={memory.memoryGroupId}
+        onSelect={(groupId) => handleMoveTo(groupId)}
+        title="Move to"
+      />
+    )}
+    </>
   );
 }
 
@@ -206,5 +272,30 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: '#fff',
     marginBottom: spacing.xs,
-  }
+  },
+  moveBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    paddingBottom: 40,
+    paddingTop: spacing.md,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  moveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 24,
+    maxWidth: '80%',
+  },
+  moveButtonText: {
+    ...typography.body,
+    color: '#fff',
+    flexShrink: 1,
+  },
 });
