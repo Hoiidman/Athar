@@ -186,7 +186,7 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
         <Text style={styles.emptyTitle}>Bulk Upload</Text>
         <Text style={styles.emptySubtitle}>
           Select multiple photos from your camera roll. We&apos;ll automatically sort them into the
-          correct Memory Group based on when they were taken!
+          correct album based on when they were taken!
         </Text>
 
         {error ? (
@@ -246,7 +246,7 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
                   {editingPhotoIndex === i ? (
                     <View style={styles.selectWrapper}>
                       <Select
-                        label="Assigned Group"
+                        label="Assigned Album"
                         value={photo.selectedGroupId}
                         options={groupOptions}
                         onSelect={(val) => updatePhotoGroup(i, val)}

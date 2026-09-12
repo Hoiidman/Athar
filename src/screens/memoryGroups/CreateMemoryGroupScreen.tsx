@@ -119,7 +119,7 @@ export function CreateMemoryGroupScreen({
         onContinue(groupId);
       }
     } catch {
-      setFormError(initialGroup ? 'Could not update memory group. Check your connection.' : 'Could not create memory group. Check your connection.');
+      setFormError(initialGroup ? 'Could not update album. Check your connection.' : 'Could not create album. Check your connection.');
     } finally {
       setSubmitting(false);
     }
@@ -173,7 +173,7 @@ export function CreateMemoryGroupScreen({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>{initialGroup ? "Edit Memory Group" : "New Memory Group"}</Text>
+          <Text style={styles.title}>{initialGroup ? "Edit Album" : "New Album"}</Text>
           <Text style={styles.subtitle}>
             {initialGroup ? "Update settings for your shared space." : "Create a shared space for an event, trip, or time period."}
           </Text>
@@ -288,7 +288,7 @@ export function CreateMemoryGroupScreen({
           </View>
 
           <View style={styles.action}>
-            <Button label={initialGroup ? "Save Changes" : "Create memory group"} onPress={handleSubmit} loading={submitting} />
+            <Button label={initialGroup ? "Save Changes" : "Create album"} onPress={handleSubmit} loading={submitting} />
             {onCancel ? (
               <Button label="Cancel" variant="secondary" onPress={onCancel} disabled={submitting} />
             ) : null}
