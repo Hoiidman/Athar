@@ -29,6 +29,9 @@ const FLASH_ICONS: Record<FlashMode, React.ComponentProps<typeof Ionicons>['name
 
 const FLASH_CYCLE: FlashMode[] = ['auto', 'on', 'off'];
 
+const TIMER_CYCLE = [0, 3, 10] as const;
+type TimerSeconds = (typeof TIMER_CYCLE)[number];
+
 const ZOOM_SENSITIVITY = 0.18;
 
 // Pixels of vertical drag needed to travel the full zoom range while recording.
@@ -78,6 +81,8 @@ export function CaptureScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [zoom, setZoom] = useState(0);
   const [gridEnabled, setGridEnabled] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState<TimerSeconds>(0);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   const cameraRef = useRef<CameraView>(null);
   const shutterOpacity = useRef(new Animated.Value(0)).current;
@@ -119,7 +124,11 @@ export function CaptureScreen() {
     setFlash((f) => FLASH_CYCLE[(FLASH_CYCLE.indexOf(f) + 1) % FLASH_CYCLE.length] ?? 'auto');
   }
 
-  async function handleTakePhoto() {
+  function cycleTimer() {
+    setTimerSeconds((t) => TIMER_CYCLE[(TIMER_CYCLE.indexOf(t) + 1) % TIMER_CYCLE.length] ?? 0);
+  }
+
+  async function capturePhoto() {
     Animated.sequence([
       Animated.timing(shutterOpacity, { toValue: 1, duration: 60, useNativeDriver: true }),
       Animated.timing(shutterOpacity, { toValue: 0, duration: 240, useNativeDriver: true }),
@@ -127,6 +136,20 @@ export function CaptureScreen() {
 
     const photo = await cameraRef.current?.takePictureAsync({ quality: 1 });
     if (photo) autoSave(addItem(photo.uri, 'photo'));
+  }
+
+  async function handleTakePhoto() {
+    if (timerSeconds === 0) {
+      await capturePhoto();
+      return;
+    }
+
+    for (let remaining = timerSeconds; remaining > 0; remaining -= 1) {
+      setCountdown(remaining);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    setCountdown(null);
+    await capturePhoto();
   }
 
   async function handleStartRecording() {
@@ -208,6 +231,12 @@ export function CaptureScreen() {
             <View style={[styles.gridLineHorizontal, { top: '66.66%' }]} />
           </View>
         )}
+
+        {countdown !== null && (
+          <View pointerEvents="none" style={styles.countdownOverlay}>
+            <Text style={styles.countdownText}>{countdown}</Text>
+          </View>
+        )}
         </>
       )}
 
@@ -224,6 +253,10 @@ export function CaptureScreen() {
             </Pressable>
             <Pressable onPress={() => setGridEnabled((g) => !g)} style={styles.iconButton} hitSlop={10}>
               <Ionicons name="grid-outline" size={26} color={gridEnabled ? colors.primary : colors.surface} />
+            </Pressable>
+            <Pressable onPress={cycleTimer} style={styles.iconButton} hitSlop={10}>
+              <Ionicons name="timer-outline" size={26} color={timerSeconds > 0 ? colors.primary : colors.surface} />
+              {timerSeconds > 0 && <Text style={styles.timerBadge}>{timerSeconds}</Text>}
             </Pressable>
           </View>
           <Pressable
@@ -366,6 +399,29 @@ const styles = StyleSheet.create({
     right: 0,
     height: StyleSheet.hairlineWidth,
     backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  timerBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    ...typography.caption,
+    fontSize: 11,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  countdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countdownText: {
+    fontSize: 96,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.9)',
   },
   bottomBar: {
     position: 'absolute',
