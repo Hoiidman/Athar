@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Modal, View, Text,  StyleSheet, Pressable, ActivityIndicator, Alert, Dimensions, FlatList } from 'react-native';
 import { useRef } from "react";
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +26,33 @@ function VideoItem({ uri }: { uri: string }) {
       player={player}
       nativeControls={true}
     />
+  );
+}
+
+function formatDuration(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+  const total = Math.floor(seconds);
+  const minutes = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${minutes}:${String(secs).padStart(2, '0')}`;
+}
+
+function VoiceItem({ uri }: { uri: string }) {
+  const player = useAudioPlayer(uri);
+  const status = useAudioPlayerStatus(player);
+
+  return (
+    <View style={styles.voicePlayer}>
+      <Pressable
+        style={styles.voicePlayButton}
+        onPress={() => (status.playing ? player.pause() : player.play())}
+      >
+        <Ionicons name={status.playing ? 'pause' : 'play'} size={36} color="#fff" />
+      </Pressable>
+      <Text style={styles.voiceDuration}>
+        {formatDuration(status.currentTime)} / {formatDuration(status.duration)}
+      </Text>
+    </View>
   );
 }
 
@@ -68,7 +96,7 @@ export function ImageViewerModal({
   }, [initialMemoryId, memories]);
 
   if (currentIndex === -1 || !memories[currentIndex]) return null;
-  
+
   const memory = memories[currentIndex];
 
   async function handleRemove() {
@@ -159,6 +187,8 @@ export function ImageViewerModal({
             <View style={{ width: screenWidth, height: '100%', justifyContent: 'center', alignItems: 'center' }}>
               {item.type === 'video' ? (
                 <VideoItem uri={item.storageUrl} />
+              ) : item.type === 'voice' ? (
+                <VoiceItem uri={item.storageUrl} />
               ) : (
                 <Image
                   source={{ uri: item.storageUrl }}
@@ -297,5 +327,23 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: '#fff',
     flexShrink: 1,
+  },
+  voicePlayer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+  },
+  voicePlayButton: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voiceDuration: {
+    ...typography.body,
+    color: '#fff',
+    fontVariant: ['tabular-nums'],
   },
 });
