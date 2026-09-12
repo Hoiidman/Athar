@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Join a family circle on Athar</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #EFEBE6;
+      color: #231F1C;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { background: #191512; color: #F3EEE8; }
+      .card { background: #241F1B !important; }
+      .code { background: #191512 !important; border-color: #3A332C !important; }
+    }
+    .card {
+      max-width: 380px;
+      width: 100%;
+      background: #FFFFFF;
+      border-radius: 20px;
+      padding: 32px 28px;
+      text-align: center;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+    }
+    .mark {
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+      background: #B4472E;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin: 0 auto 16px;
+    }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    p { font-size: 15px; line-height: 1.5; color: #6B6259; margin: 0 0 20px; }
+    .code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 22px;
+      letter-spacing: 2px;
+      background: #EFEBE6;
+      border: 1px solid #DDD5CB;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 20px;
+    }
+    a.btn, button.btn {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 14px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    .btn-primary { background: #B4472E; color: #fff; }
+    .btn-secondary { background: transparent; color: #B4472E; border: 1px solid #B4472E; }
+    .hint { font-size: 13px; color: #948B80; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="mark">أثر</div>
+    <h1>You're invited to a family circle</h1>
+    <p>Open Athar to join with this code, or get the app if you don't have it yet.</p>
+    <div class="code" id="code">------</div>
+
+    <a class="btn btn-primary" id="open-app" href="#">Open in Athar</a>
+    <a class="btn btn-secondary" id="get-app" href="#" target="_blank" rel="noopener">Get Athar</a>
+
+    <p class="hint">If the app doesn't open automatically, install it, then choose "Join a circle" and enter the code above.</p>
+  </div>
+
+  <script>
+    (function () {
+      var parts = window.location.pathname.split('/').filter(Boolean);
+      var code = parts[parts.length - 1] || '';
+      document.getElementById('code').textContent = code || '------';
+
+      var scheme = 'athar://join/' + encodeURIComponent(code);
+      document.getElementById('open-app').href = scheme;
+
+      var ua = navigator.userAgent || '';
+      var isIOS = /iphone|ipad|ipod/i.test(ua);
+      var isAndroid = /android/i.test(ua);
+
+      var storeUrl = isIOS
+        ? 'https://apps.apple.com/app/id0000000000' // TODO: replace with real App Store id once published
+        : isAndroid
+        ? 'https://play.google.com/store/apps/details?id=com.athar.app' // TODO: replace once published
+        : 'https://athar-smac2026.web.app';
+      document.getElementById('get-app').href = storeUrl;
+
+      var opened = false;
+      window.addEventListener('blur', function () { opened = true; });
+      setTimeout(function () {
+        if (!opened) window.location.href = scheme;
+      }, 400);
+    })();
+  </script>
+</body>
+</html>

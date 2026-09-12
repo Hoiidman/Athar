@@ -27,7 +27,7 @@ export function MemoryGroupsNavigator({ user }: { user: User }) {
       </Stack.Screen>
       <Stack.Screen
         name="CreateMemoryGroup"
-        options={({ route }) => ({ headerShown: true, title: route.params?.initialGroup ? 'Edit Memory Group' : 'New Memory Group' })}
+        options={({ route }) => ({ headerShown: true, title: route.params?.initialGroup ? 'Edit Album' : 'New Album' })}
       >
         {({ navigation, route }) => (
           <CreateMemoryGroupScreen
@@ -39,7 +39,7 @@ export function MemoryGroupsNavigator({ user }: { user: User }) {
           />
         )}
       </Stack.Screen>
-      <Stack.Screen name="MemoryGroupDetail" options={{ headerShown: true, title: 'Memory Group' }}>
+      <Stack.Screen name="MemoryGroupDetail" options={{ headerShown: true, title: 'Album' }}>
         {({ navigation, route }) => (
           <MemoryGroupDetailScreen 
             groupId={route.params.groupId} 

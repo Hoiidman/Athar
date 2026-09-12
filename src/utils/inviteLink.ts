@@ -1,7 +1,7 @@
-import * as Linking from 'expo-linking';
+const INVITE_LINK_HOST = 'athar-smac2026.web.app';
 
 export function inviteLink(code: string) {
-  return Linking.createURL(`join/${code}`);
+  return `https://${INVITE_LINK_HOST}/join/${code}`;
 }
 
 export function inviteMessage(circleName: string, code: string) {
