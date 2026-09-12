@@ -28,7 +28,7 @@ import { CaptureItem, useCaptureSessionStore } from '../../store/captureSessionS
 import { useCaptureDestinationStore } from '../../store/captureDestinationStore';
 import { useAuth } from '../../hooks/useAuth';
 import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
-import { uploadBatchedMemories } from '../../services/memories';
+import { deleteMemory, replaceMemoryMedia, uploadBatchedMemories } from '../../services/memories';
 import { AlbumPicker } from '../capture/AlbumPicker';
 import { clampOverlayScale, DraggableItem, DragPosition } from './DraggableItem';
 import { DrawCanvas, Stroke } from './DrawCanvas';
@@ -319,16 +319,16 @@ function Carousel({ items, selectedId, onSelect }: CarouselProps) {
 }
 
 interface ActionsProps {
-  albumLabel: string;
+  saveLabel: string;
   busy: boolean;
   saving: boolean;
   onShare: () => void;
   onSave: () => void;
-  /** Long pressing save is how the destination space gets changed. */
-  onPickAlbum: () => void;
+  /** Long pressing save is how the destination space gets changed. Omitted once already saved. */
+  onPickAlbum?: () => void;
 }
 
-function Actions({ albumLabel, busy, saving, onShare, onSave, onPickAlbum }: ActionsProps) {
+function Actions({ saveLabel, busy, saving, onShare, onSave, onPickAlbum }: ActionsProps) {
   return (
     <View style={styles.actions}>
       <Pressable style={[styles.action, styles.actionSecondary]} onPress={onShare} disabled={busy}>
@@ -348,7 +348,7 @@ function Actions({ albumLabel, busy, saving, onShare, onSave, onPickAlbum }: Act
           <>
             <Ionicons name="checkmark" size={20} color={colors.textOnAccent} />
             <Text style={[styles.actionText, styles.actionTextPrimary]} numberOfLines={1}>
-              Save to {albumLabel}
+              {saveLabel}
             </Text>
           </>
         )}
@@ -677,19 +677,33 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
 
   function deleteCurrent() {
     if (!selected) return;
-    Alert.alert('Delete this capture?', 'It will be removed from this session.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          const fallback = ordered[index + 1] ?? ordered[index - 1];
-          removeItem(selected.id);
-          if (fallback) setSelectedId(fallback.id);
-          else navigation.goBack();
+    const savedMemoryId = selected.savedMemoryId;
+    Alert.alert(
+      savedMemoryId ? 'Delete this memory?' : 'Delete this capture?',
+      savedMemoryId ? "This can't be undone." : 'It will be removed from this session.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            if (savedMemoryId) {
+              try {
+                await deleteMemory(savedMemoryId);
+              } catch (e) {
+                console.error(e);
+                Alert.alert('Error', 'Could not delete this memory.');
+                return;
+              }
+            }
+            const fallback = ordered[index + 1] ?? ordered[index - 1];
+            removeItem(selected.id);
+            if (fallback) setSelectedId(fallback.id);
+            else navigation.goBack();
+          },
         },
-      },
-    ]);
+      ],
+    );
   }
 
   async function flatten() {
@@ -702,7 +716,12 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   }
 
   async function handleSave() {
-    if (busy || !user || membership.status !== 'ready' || !membership.circleId || !selected) return;
+    if (busy || !selected) return;
+    if (selected.savedMemoryId) {
+      handleSaveExisting(selected.savedMemoryId);
+      return;
+    }
+    if (!user || membership.status !== 'ready' || !membership.circleId) return;
     setBusy(true);
     setSaving(true);
     try {
@@ -733,6 +752,51 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
     } catch (e) {
       console.error(e);
       Alert.alert('Upload Failed', 'Could not upload memory.');
+    } finally {
+      setBusy(false);
+      setSaving(false);
+    }
+  }
+
+  function handleSaveExisting(savedMemoryId: string) {
+    Alert.alert('Save changes', 'Override the existing photo, or save as a new one?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Create New', onPress: () => finalizeExisting(savedMemoryId, 'new') },
+      { text: 'Override Existing', onPress: () => finalizeExisting(savedMemoryId, 'override') },
+    ]);
+  }
+
+  async function finalizeExisting(savedMemoryId: string, mode: 'override' | 'new') {
+    if (busy || !user || membership.status !== 'ready' || !membership.circleId || !selected) return;
+    setBusy(true);
+    setSaving(true);
+    try {
+      const finalUri = await flatten();
+
+      if (mode === 'override') {
+        await replaceMemoryMedia(user, savedMemoryId, finalUri);
+      } else {
+        const type = selected.kind === 'video' ? 'video' : 'photo';
+        await uploadBatchedMemories(
+          user,
+          membership.circleId,
+          [{ uri: finalUri, groupId: destinationId, takenAtMs: Date.now(), type }],
+          () => {},
+        );
+      }
+
+      removeItem(selected.id);
+
+      if (items.length <= 1) {
+        navigation.navigate('Tabs', { screen: 'Timeline' });
+      } else {
+        const idx = ordered.findIndex((o) => o.id === selected.id);
+        const fallback = ordered[idx + 1] ?? ordered[idx - 1];
+        if (fallback) setSelectedId(fallback.id);
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Save Failed', 'Could not save your changes.');
     } finally {
       setBusy(false);
       setSaving(false);
@@ -784,7 +848,7 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   const filter = FILTERS.find((option) => option.id === current.filter) ?? FILTERS[0];
   const dismissable =
     activeTool === 'filters' || activeTool === 'sounds' || activeTool === 'stickers';
-  const albumLabel = destinationLabel;
+  const saveLabel = selected?.savedMemoryId ? 'Save' : `Save to ${destinationLabel}`;
   const showActions = activeTool === null;
 
   return (
@@ -953,22 +1017,24 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
 
         {showActions && (
           <Actions
-            albumLabel={albumLabel}
+            saveLabel={saveLabel}
             busy={busy}
             saving={saving}
             onShare={handleShare}
             onSave={handleSave}
-            onPickAlbum={() => setAlbumPickerVisible(true)}
+            onPickAlbum={selected?.savedMemoryId ? undefined : () => setAlbumPickerVisible(true)}
           />
         )}
       </View>
 
-      <AlbumPicker
-        visible={albumPickerVisible}
-        onClose={() => setAlbumPickerVisible(false)}
-        selectedId={destinationId}
-        onSelect={setDestination}
-      />
+      {!selected?.savedMemoryId && (
+        <AlbumPicker
+          visible={albumPickerVisible}
+          onClose={() => setAlbumPickerVisible(false)}
+          selectedId={destinationId}
+          onSelect={setDestination}
+        />
+      )}
     </View>
   );
 }

@@ -9,7 +9,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootStackNavigator';
 import { useCaptureMediaPermissions } from '../../hooks/useCaptureMediaPermissions';
 import { useCaptureDestinationStore } from '../../store/captureDestinationStore';
-import { useCaptureSessionStore } from '../../store/captureSessionStore';
+import { useCaptureSessionStore, type CaptureItem } from '../../store/captureSessionStore';
+import { useAuth } from '../../hooks/useAuth';
+import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
+import { uploadBatchedMemories } from '../../services/memories';
 import { CaptureButton } from './CaptureButton';
 import { AlbumPicker } from './AlbumPicker';
 import { VoiceRecorder } from './VoiceRecorder';
@@ -26,6 +29,9 @@ const FLASH_ICONS: Record<FlashMode, React.ComponentProps<typeof Ionicons>['name
 
 const FLASH_CYCLE: FlashMode[] = ['auto', 'on', 'off'];
 
+const TIMER_CYCLE = [0, 3, 10] as const;
+type TimerSeconds = (typeof TIMER_CYCLE)[number];
+
 const ZOOM_SENSITIVITY = 0.18;
 
 // Pixels of vertical drag needed to travel the full zoom range while recording.
@@ -41,6 +47,31 @@ export function CaptureScreen() {
   const { destinationId, destinationLabel, setDestination } = useCaptureDestinationStore();
   const items = useCaptureSessionStore((state) => state.items);
   const addItem = useCaptureSessionStore((state) => state.addItem);
+  const markSaved = useCaptureSessionStore((state) => state.markSaved);
+  const { user } = useAuth();
+  const { state: membership } = useFamilyCircleMembership(user);
+
+  function autoSave(item: CaptureItem, durationSeconds?: number) {
+    if (!user || membership.status !== 'ready' || !membership.circleId) return;
+    const type = item.kind === 'video' ? 'video' : item.kind === 'audio' ? 'voice' : 'photo';
+    uploadBatchedMemories(
+      user,
+      membership.circleId,
+      [{
+        uri: item.uri,
+        groupId: destinationId,
+        takenAtMs: item.createdAt,
+        type,
+        durationSeconds,
+      }],
+      () => {},
+    )
+      .then((result) => {
+        const id = result.ids[0];
+        if (id) markSaved(item.id, id);
+      })
+      .catch((e) => console.error('Auto-save failed', e));
+  }
 
   const [facing, setFacing] = useState<Facing>('back');
   const [flash, setFlash] = useState<FlashMode>('auto');
@@ -49,6 +80,11 @@ export function CaptureScreen() {
   const [albumPickerVisible, setAlbumPickerVisible] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [zoom, setZoom] = useState(0);
+  const [availableLenses, setAvailableLenses] = useState<string[]>([]);
+  const [selectedLens, setSelectedLens] = useState<string | undefined>(undefined);
+  const [gridEnabled, setGridEnabled] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState<TimerSeconds>(0);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   const cameraRef = useRef<CameraView>(null);
   const shutterOpacity = useRef(new Animated.Value(0)).current;
@@ -79,6 +115,26 @@ export function CaptureScreen() {
     applyZoom(zoomBase.current - dy / ZOOM_DRAG_DISTANCE);
   }
 
+  const ultraWideLens = availableLenses.find((lens) => /ultra.?wide/i.test(lens));
+  const isUltraWide = selectedLens !== undefined && selectedLens === ultraWideLens;
+
+  function selectLens(lens: string | undefined) {
+    setSelectedLens(lens);
+    zoomBase.current = 0;
+    applyZoom(0);
+  }
+
+  useEffect(() => {
+    if (facing !== 'back') {
+      setSelectedLens(undefined);
+      return;
+    }
+    cameraRef.current
+      ?.getAvailableLensesAsync()
+      .then(setAvailableLenses)
+      .catch(() => setAvailableLenses([]));
+  }, [facing]);
+
   useEffect(() => {
     if (cameraPermission && !cameraPermission.granted && cameraPermission.canAskAgain) {
       requestAll();
@@ -90,14 +146,32 @@ export function CaptureScreen() {
     setFlash((f) => FLASH_CYCLE[(FLASH_CYCLE.indexOf(f) + 1) % FLASH_CYCLE.length] ?? 'auto');
   }
 
-  async function handleTakePhoto() {
+  function cycleTimer() {
+    setTimerSeconds((t) => TIMER_CYCLE[(TIMER_CYCLE.indexOf(t) + 1) % TIMER_CYCLE.length] ?? 0);
+  }
+
+  async function capturePhoto() {
     Animated.sequence([
       Animated.timing(shutterOpacity, { toValue: 1, duration: 60, useNativeDriver: true }),
       Animated.timing(shutterOpacity, { toValue: 0, duration: 240, useNativeDriver: true }),
     ]).start();
 
-    const photo = await cameraRef.current?.takePictureAsync();
-    if (photo) addItem(photo.uri, 'photo');
+    const photo = await cameraRef.current?.takePictureAsync({ quality: 1 });
+    if (photo) autoSave(addItem(photo.uri, 'photo'));
+  }
+
+  async function handleTakePhoto() {
+    if (timerSeconds === 0) {
+      await capturePhoto();
+      return;
+    }
+
+    for (let remaining = timerSeconds; remaining > 0; remaining -= 1) {
+      setCountdown(remaining);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    setCountdown(null);
+    await capturePhoto();
   }
 
   async function handleStartRecording() {
@@ -113,7 +187,7 @@ export function CaptureScreen() {
     // recording, and it has to stay in video mode until the file comes back.
     await new Promise((resolve) => setTimeout(resolve, 150));
     const video = await cameraRef.current?.recordAsync();
-    if (video) addItem(video.uri, 'video');
+    if (video) autoSave(addItem(video.uri, 'video'));
     setCameraMode('picture');
   }
 
@@ -148,7 +222,11 @@ export function CaptureScreen() {
   return (
     <View style={styles.container}>
       {voiceMode ? (
-        <VoiceRecorder onRecorded={(uri) => addItem(uri, 'audio')} />
+        <VoiceRecorder
+          onRecorded={(uri, durationMillis) =>
+            autoSave(addItem(uri, 'audio'), Math.round(durationMillis / 1000))
+          }
+        />
       ) : (
         <>
         <GestureDetector gesture={pinchGesture}>
@@ -161,10 +239,27 @@ export function CaptureScreen() {
               mode={cameraMode}
               zoom={zoom}
               mirror={facing === 'front'}
+              videoQuality="1080p"
+              videoStabilizationMode="auto"
+              selectedLens={selectedLens}
             />
           </View>
         </GestureDetector>
-        
+
+        {gridEnabled && (
+          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+            <View style={[styles.gridLineVertical, { left: '33.33%' }]} />
+            <View style={[styles.gridLineVertical, { left: '66.66%' }]} />
+            <View style={[styles.gridLineHorizontal, { top: '33.33%' }]} />
+            <View style={[styles.gridLineHorizontal, { top: '66.66%' }]} />
+          </View>
+        )}
+
+        {countdown !== null && (
+          <View pointerEvents="none" style={styles.countdownOverlay}>
+            <Text style={styles.countdownText}>{countdown}</Text>
+          </View>
+        )}
         </>
       )}
 
@@ -175,9 +270,18 @@ export function CaptureScreen() {
 
       {!voiceMode && (
         <SafeAreaView style={styles.topBar} edges={['top']}>
-          <Pressable onPress={cycleFlash} style={styles.iconButton} hitSlop={10}>
-            <Ionicons name={FLASH_ICONS[flash]} size={30} color={colors.surface} />
-          </Pressable>
+          <View style={styles.topBarGroup}>
+            <Pressable onPress={cycleFlash} style={styles.iconButton} hitSlop={10}>
+              <Ionicons name={FLASH_ICONS[flash]} size={28} color={colors.surface} />
+            </Pressable>
+            <Pressable onPress={() => setGridEnabled((g) => !g)} style={styles.iconButton} hitSlop={10}>
+              <Ionicons name="grid-outline" size={26} color={gridEnabled ? colors.primary : colors.surface} />
+            </Pressable>
+            <Pressable onPress={cycleTimer} style={styles.iconButton} hitSlop={10}>
+              <Ionicons name="timer-outline" size={26} color={timerSeconds > 0 ? colors.primary : colors.surface} />
+              {timerSeconds > 0 && <Text style={styles.timerBadge}>{timerSeconds}</Text>}
+            </Pressable>
+          </View>
           <Pressable
             onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}
             style={styles.iconButton}
@@ -199,6 +303,26 @@ export function CaptureScreen() {
             <Ionicons name="chevron-down" size={16} color={colors.surface} />
           </Pressable>
         </Animated.View>
+
+        {!voiceMode && facing === 'back' && ultraWideLens && (
+          <Animated.View
+            style={[styles.lensRow, { opacity: chromeOpacity }]}
+            pointerEvents={isRecording ? 'none' : 'auto'}
+          >
+            <Pressable
+              style={[styles.lensChip, isUltraWide && styles.lensChipActive]}
+              onPress={() => selectLens(ultraWideLens)}
+            >
+              <Text style={[styles.lensChipText, isUltraWide && styles.lensChipTextActive]}>0.5x</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.lensChip, !isUltraWide && styles.lensChipActive]}
+              onPress={() => selectLens(undefined)}
+            >
+              <Text style={[styles.lensChipText, !isUltraWide && styles.lensChipTextActive]}>1x</Text>
+            </Pressable>
+          </Animated.View>
+        )}
 
         <View style={[styles.captureRow, voiceMode && styles.captureRowVoice]}>
           <Animated.View
@@ -301,6 +425,47 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingTop: spacing.xs,
   },
+  topBarGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  gridLineVertical: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  gridLineHorizontal: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  timerBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    ...typography.caption,
+    fontSize: 11,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  countdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countdownText: {
+    fontSize: 96,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.9)',
+  },
   bottomBar: {
     position: 'absolute',
     bottom: 0,
@@ -322,6 +487,28 @@ const styles = StyleSheet.create({
   albumLabel: {
     ...typography.caption,
     color: colors.surface,
+  },
+  lensRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  lensChip: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  lensChipActive: {
+    backgroundColor: colors.primary,
+  },
+  lensChipText: {
+    ...typography.caption,
+    color: colors.surface,
+  },
+  lensChipTextActive: {
+    fontWeight: '700',
   },
   captureRow: {
     flexDirection: 'row',
