@@ -80,6 +80,8 @@ export function CaptureScreen() {
   const [albumPickerVisible, setAlbumPickerVisible] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [zoom, setZoom] = useState(0);
+  const [availableLenses, setAvailableLenses] = useState<string[]>([]);
+  const [selectedLens, setSelectedLens] = useState<string | undefined>(undefined);
   const [gridEnabled, setGridEnabled] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState<TimerSeconds>(0);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -112,6 +114,26 @@ export function CaptureScreen() {
   function handleZoomDrag(dy: number) {
     applyZoom(zoomBase.current - dy / ZOOM_DRAG_DISTANCE);
   }
+
+  const ultraWideLens = availableLenses.find((lens) => /ultra.?wide/i.test(lens));
+  const isUltraWide = selectedLens !== undefined && selectedLens === ultraWideLens;
+
+  function selectLens(lens: string | undefined) {
+    setSelectedLens(lens);
+    zoomBase.current = 0;
+    applyZoom(0);
+  }
+
+  useEffect(() => {
+    if (facing !== 'back') {
+      setSelectedLens(undefined);
+      return;
+    }
+    cameraRef.current
+      ?.getAvailableLensesAsync()
+      .then(setAvailableLenses)
+      .catch(() => setAvailableLenses([]));
+  }, [facing]);
 
   useEffect(() => {
     if (cameraPermission && !cameraPermission.granted && cameraPermission.canAskAgain) {
@@ -219,6 +241,7 @@ export function CaptureScreen() {
               mirror={facing === 'front'}
               videoQuality="1080p"
               videoStabilizationMode="auto"
+              selectedLens={selectedLens}
             />
           </View>
         </GestureDetector>
@@ -280,6 +303,26 @@ export function CaptureScreen() {
             <Ionicons name="chevron-down" size={16} color={colors.surface} />
           </Pressable>
         </Animated.View>
+
+        {!voiceMode && facing === 'back' && ultraWideLens && (
+          <Animated.View
+            style={[styles.lensRow, { opacity: chromeOpacity }]}
+            pointerEvents={isRecording ? 'none' : 'auto'}
+          >
+            <Pressable
+              style={[styles.lensChip, isUltraWide && styles.lensChipActive]}
+              onPress={() => selectLens(ultraWideLens)}
+            >
+              <Text style={[styles.lensChipText, isUltraWide && styles.lensChipTextActive]}>0.5x</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.lensChip, !isUltraWide && styles.lensChipActive]}
+              onPress={() => selectLens(undefined)}
+            >
+              <Text style={[styles.lensChipText, !isUltraWide && styles.lensChipTextActive]}>1x</Text>
+            </Pressable>
+          </Animated.View>
+        )}
 
         <View style={[styles.captureRow, voiceMode && styles.captureRowVoice]}>
           <Animated.View
@@ -444,6 +487,28 @@ const styles = StyleSheet.create({
   albumLabel: {
     ...typography.caption,
     color: colors.surface,
+  },
+  lensRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  lensChip: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  lensChipActive: {
+    backgroundColor: colors.primary,
+  },
+  lensChipText: {
+    ...typography.caption,
+    color: colors.surface,
+  },
+  lensChipTextActive: {
+    fontWeight: '700',
   },
   captureRow: {
     flexDirection: 'row',
