@@ -18,6 +18,24 @@ export async function deleteMemory(memoryId: string) {
   await deleteDoc(doc(firestore, 'memories', memoryId));
 }
 
+export async function replaceMemoryMedia(user: User, memoryId: string, uri: string) {
+  const response = await fetch(uri);
+  const blob = await response.blob();
+
+  const fileExtension = uri.split('.').pop()?.toLowerCase() ?? 'jpg';
+  const uniqueId = Math.random().toString(36).substring(2, 15);
+  const storagePath = `memories/${user.uid}/${uniqueId}.${fileExtension}`;
+  const storageRef = ref(storage, storagePath);
+
+  await uploadBytes(storageRef, blob);
+  const downloadUrl = await getDownloadURL(storageRef);
+
+  await updateDoc(doc(firestore, 'memories', memoryId), {
+    storageUrl: downloadUrl,
+    updatedAt: serverTimestamp(),
+  });
+}
+
 export interface UploadablePhoto {
   uri: string;
   localThumbnailUri?: string;

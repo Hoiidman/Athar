@@ -6,6 +6,8 @@ import { Modal, View, Text, StyleSheet, Pressable, ActivityIndicator, Alert, Dim
 import { useRef } from "react";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Memory, MemoryGroup } from '../types/memory';
 import { MY_SPACE_GROUP_ID } from '../types';
 import { colors, spacing, typography } from '../theme';
@@ -13,6 +15,7 @@ import { deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { firestore } from '../services/firebase';
 import { moveMemoryToGroup } from '../services/memories';
 import { AlbumPicker } from '../screens/capture/AlbumPicker';
+import type { RootStackParamList } from '../navigation/RootStackNavigator';
 
 
 function VideoItem({ uri }: { uri: string }) {
@@ -72,6 +75,7 @@ export function ImageViewerModal({
   onClose,
   groups = [],
 }: ImageViewerModalProps) {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const [removing, setRemoving] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(-1);
@@ -134,6 +138,20 @@ export function ImageViewerModal({
     }
   }
 
+  function handleEdit() {
+    // avoids stacking a second native modal underneath the editor
+    onClose();
+    navigation.navigate('MediaPreview', {
+      itemId: memory.id,
+      editMemory: {
+        memoryId: memory.id,
+        uri: memory.storageUrl,
+        kind: memory.type === 'video' ? 'video' : 'photo',
+        groupId: memory.memoryGroupId,
+      },
+    });
+  }
+
   async function handleMoveTo(groupId: string) {
     setMoving(true);
     try {
@@ -150,6 +168,7 @@ export function ImageViewerModal({
     memory.memoryGroupId === MY_SPACE_GROUP_ID
       ? 'My Space'
       : groups.find((g) => g.id === memory.memoryGroupId)?.title ?? 'Shared';
+  const editable = memory.type !== 'voice';
 
   return (
     <Modal visible={true} transparent animationType="fade" onRequestClose={onClose}>
@@ -158,6 +177,11 @@ export function ImageViewerModal({
           <Pressable onPress={onClose} style={styles.iconButton}>
             <Ionicons name="close" size={28} color="#fff" />
           </Pressable>
+          {editable && (
+            <Pressable onPress={handleEdit} style={styles.iconButton}>
+              <Ionicons name="create-outline" size={26} color="#fff" />
+            </Pressable>
+          )}
         </View>
 
         <FlatList
