@@ -62,17 +62,12 @@ const EMPTY_EDITS: MediaEdits = { filter: 'none', texts: [], stickers: [], strok
 const SWIPE_CLOSE_DISTANCE = 130;
 const SWIPE_CHANGE_DISTANCE = 60;
 
-// How far the stage can travel downwards, and how much of the drag past the
-// close threshold actually lands, so the screen never leaves a gap behind it.
 const MAX_DOWN_DRAG = 200;
 const DRAG_RESISTANCE = 0.25;
 
-// A full screen modal does not always report insets, and without a floor the
-// buttons land under the status bar where they cannot be tapped.
 const MIN_TOP_INSET = 16;
 const MIN_BOTTOM_INSET = 12;
 
-// Anything dropped below this line while dragging gets removed.
 const DELETE_ZONE_HEIGHT = 150;
 
 const FRAME_SIZE = 56;
@@ -98,7 +93,6 @@ function isEdited(edits: MediaEdits) {
  * Hooks
  * ------------------------------------------------------------------ */
 
-/** Height the keyboard is covering, so the bottom bar can sit above it. */
 function useKeyboardOffset() {
   const [offset, setOffset] = useState(0);
 
@@ -118,10 +112,6 @@ function useKeyboardOffset() {
   return offset;
 }
 
-/**
- * Edits are kept per capture, with a snapshot pushed before every change so
- * undo can walk back through them one step at a time.
- */
 function usePreviewEdits(selectedId: string | undefined) {
   const [edits, setEdits] = useState<Record<string, MediaEdits>>({});
   const [history, setHistory] = useState<Record<string, MediaEdits[]>>({});
@@ -152,10 +142,6 @@ function usePreviewEdits(selectedId: string | undefined) {
  * Stage pieces
  * ------------------------------------------------------------------ */
 
-/**
- * Neighbours only exist to be swiped onto, so they skip the editing layers and
- * a video keeps a poster rather than spinning up a second player.
- */
 function StaticMedia({ item }: { item: CaptureItem }) {
   if (item.kind === 'video') {
     return (
@@ -430,7 +416,6 @@ function DrawPanel({ inkColor, onChangeColor, onDone }: DrawPanelProps) {
 }
 
 interface FilterPanelProps {
-  /** The photo being edited, so each tile previews the real thing. */
   previewUri?: string;
   active: FilterId;
   onSelect: (filter: FilterId) => void;
@@ -506,8 +491,6 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
 
   const editMemory = route.params.editMemory;
 
-  // Newest first, so the shot you just took reads as 1 of 3. In edit mode
-  // there's exactly one item: the existing memory being re-edited.
   const ordered = useMemo(() => {
     if (editMemory) {
       return [
@@ -538,7 +521,18 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   );
   const selected = ordered[index];
 
-  const activeEditTarget = editMemory ?? null;
+  // Either explicitly editing a saved memory from the timeline, or reopening
+  // a capture item that already auto-saved — both save by overriding or
+  // creating new, rather than uploading a fresh copy.
+  const activeEditTarget = editMemory
+    ?? (selected?.savedMemoryId
+      ? {
+          memoryId: selected.savedMemoryId,
+          uri: selected.uri,
+          kind: (selected.kind === 'video' ? 'video' : 'photo') as 'photo' | 'video',
+          groupId: destinationId,
+        }
+      : null);
 
   const { current, canUndo, update, undo } = usePreviewEdits(selected?.id);
   const edited = isEdited(current);
@@ -550,9 +544,6 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   const dragX = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
 
-  // Overlay scale lives here rather than in each item, so a pinch anywhere on
-  // screen can resize the one that was touched last — an item too small to fit
-  // two fingers is still resizable.
   const overlayScales = useRef<Record<string, Animated.Value>>({});
   const overlayScaleBase = useRef<Record<string, number>>({});
   const activeOverlay = useRef<string | null>(null);
@@ -567,8 +558,6 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
     instance.play();
   });
 
-  // Snapping back to centre has to happen in the same commit that renders the
-  // new selection, or the old image shows for a frame at the reset offset.
   useLayoutEffect(() => {
     dragX.setValue(0);
     dragY.setValue(0);
@@ -582,7 +571,6 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   }
 
   function requestClose() {
-    // Nothing to lose outside edit mode, so closing just closes.
     if (!edited) {
       navigation.goBack();
       return;
@@ -600,8 +588,6 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
       springHome();
       return;
     }
-    // The neighbour is already sitting at that offset, so once the travel
-    // finishes the swap is invisible and no reset animation is needed.
     Animated.timing(dragX, {
       toValue: -direction * width,
       duration: 180,
@@ -627,8 +613,6 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
             return;
           }
 
-          // Paging is only offered outside edit mode, and only towards a
-          // neighbour that exists — otherwise the stage stays put.
           const forward = event.translationX < 0;
           const blocked = editMode || (forward ? !ordered[index + 1] : !ordered[index - 1]);
           dragX.setValue(blocked ? 0 : event.translationX);
@@ -730,15 +714,18 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
 
   async function flatten() {
     if (!selected) return '';
-    // view-shot cannot pull a frame out of a video, so its own file is the
-    // only sensible thing to hand on.
     if (selected.kind === 'video') return selected.uri;
     if (!edited) return selected.uri;
     return captureRef(stageRef, { format: 'jpg', quality: 0.95 });
   }
 
   async function handleSave() {
-    if (busy || !user || membership.status !== 'ready' || !membership.circleId || !selected) return;
+    if (busy || !selected) return;
+    if (activeEditTarget) {
+      handleSaveEdit();
+      return;
+    }
+    if (!user || membership.status !== 'ready' || !membership.circleId) return;
     setBusy(true);
     setSaving(true);
     try {
@@ -773,6 +760,15 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
       setBusy(false);
       setSaving(false);
     }
+  }
+
+  function handleSaveEdit() {
+    if (busy || !selected) return;
+    Alert.alert('Save changes', 'Override the existing photo, or save as a new one?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Create New', onPress: () => finalizeEdit('new') },
+      { text: 'Override Existing', onPress: () => finalizeEdit('override') },
+    ]);
   }
 
   async function finalizeEdit(mode: 'override' | 'new') {
@@ -817,15 +813,6 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
       setBusy(false);
       setSaving(false);
     }
-  }
-
-  function handleSaveEdit() {
-    if (busy || !selected) return;
-    Alert.alert('Save changes', 'Override the existing photo, or save as a new one?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Create New', onPress: () => finalizeEdit('new') },
-      { text: 'Override Existing', onPress: () => finalizeEdit('override') },
-    ]);
   }
 
   async function handleShare() {
@@ -1219,7 +1206,6 @@ const styles = StyleSheet.create({
     color: colors.surface,
   },
   strip: {
-    // Pinned so an RTL locale does not flip the running order.
     direction: 'ltr',
     gap: spacing.xs,
     paddingHorizontal: spacing.sm,

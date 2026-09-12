@@ -6,6 +6,16 @@
   "storage": {
     "rules": "storage.rules"
   },
+  "hosting": {
+    "public": "public",
+    "ignore": ["firebase.json", "**/.DS_Store", "**/node_modules/**"],
+    "rewrites": [
+      {
+        "source": "/join/**",
+        "destination": "/join/index.html"
+      }
+    ]
+  },
   "functions": {
     "source": "functions",
     "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"]

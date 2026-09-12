@@ -10,7 +10,7 @@ import {
 import { colors, typography } from '../../theme';
 
 interface Props {
-  onRecorded: (uri: string) => void;
+  onRecorded: (uri: string, durationMillis: number) => void;
 }
 
 function formatDuration(millis: number) { // Converts MS "MM:SS"
@@ -67,10 +67,9 @@ export function VoiceRecorder({ onRecorded }: Props) {
 
     if (!recorder.isRecording) return;
 
+    const durationMillis = state.durationMillis;
     await recorder.stop();
-    if (recorder.uri) onRecorded(recorder.uri);
-
-    // TODO: Handle recording save to album
+    if (recorder.uri) onRecorded(recorder.uri, durationMillis);
   }
 
   return (

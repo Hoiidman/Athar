@@ -41,13 +41,15 @@ export interface UploadablePhoto {
   localThumbnailUri?: string;
   groupId: string; // can be 'my-space'
   takenAtMs: number | null;
-  type: "photo" | "video";
+  type: "photo" | "video" | "voice";
   durationSeconds?: number;
 }
 
 export interface BatchUploadResult {
   uploaded: number;
   failed: number;
+  /** Created memory doc ids, in the same order as the input photos; null where upload failed. */
+  ids: (string | null)[];
 }
 
 // Uploads run a few at a time. Sequentially, a few hundred photos takes long
@@ -55,7 +57,7 @@ export interface BatchUploadResult {
 // start starving each other of bandwidth.
 const UPLOAD_CONCURRENCY = 4;
 
-async function uploadSingleMemory(user: User, circleId: string, photo: UploadablePhoto) {
+async function uploadSingleMemory(user: User, circleId: string, photo: UploadablePhoto): Promise<string> {
   // 1. Fetch the file blob
   const response = await fetch(photo.uri);
   const blob = await response.blob();
@@ -87,7 +89,7 @@ async function uploadSingleMemory(user: User, circleId: string, photo: Uploadabl
   // 4. Create the Firestore document
   const isPrivate = photo.groupId === MY_SPACE_GROUP_ID;
 
-  await addDoc(collection(firestore, 'memories'), {
+  const docRef = await addDoc(collection(firestore, 'memories'), {
     familyCircleId: circleId,
     memoryGroupId: photo.groupId,
     visibility: isPrivate ? 'private' : 'shared',
@@ -106,6 +108,8 @@ async function uploadSingleMemory(user: User, circleId: string, photo: Uploadabl
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+
+  return docRef.id;
 }
 
 export async function uploadBatchedMemories(
@@ -117,6 +121,7 @@ export async function uploadBatchedMemories(
   const total = photos.length;
   let current = 0;
   let failed = 0;
+  const ids: (string | null)[] = new Array(total).fill(null);
 
   // A shared cursor lets each worker pull the next photo as soon as it frees
   // up, so one slow video doesn't hold back the rest of the batch.
@@ -129,7 +134,7 @@ export async function uploadBatchedMemories(
       if (!photo) return;
 
       try {
-        await uploadSingleMemory(user, circleId, photo);
+        ids[index] = await uploadSingleMemory(user, circleId, photo);
       } catch (e) {
         // One bad file shouldn't cost the user the whole batch.
         failed++;
@@ -145,5 +150,5 @@ export async function uploadBatchedMemories(
     Array.from({ length: Math.min(UPLOAD_CONCURRENCY, total) }, () => worker()),
   );
 
-  return { uploaded: total - failed, failed };
+  return { uploaded: total - failed, failed, ids };
 }
