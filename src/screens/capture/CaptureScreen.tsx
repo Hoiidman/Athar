@@ -9,7 +9,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootStackNavigator';
 import { useCaptureMediaPermissions } from '../../hooks/useCaptureMediaPermissions';
 import { useCaptureDestinationStore } from '../../store/captureDestinationStore';
-import { useCaptureSessionStore } from '../../store/captureSessionStore';
+import { useCaptureSessionStore, type CaptureItem } from '../../store/captureSessionStore';
+import { useAuth } from '../../hooks/useAuth';
+import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
+import { uploadBatchedMemories } from '../../services/memories';
 import { CaptureButton } from './CaptureButton';
 import { AlbumPicker } from './AlbumPicker';
 import { VoiceRecorder } from './VoiceRecorder';
@@ -41,6 +44,31 @@ export function CaptureScreen() {
   const { destinationId, destinationLabel, setDestination } = useCaptureDestinationStore();
   const items = useCaptureSessionStore((state) => state.items);
   const addItem = useCaptureSessionStore((state) => state.addItem);
+  const markSaved = useCaptureSessionStore((state) => state.markSaved);
+  const { user } = useAuth();
+  const { state: membership } = useFamilyCircleMembership(user);
+
+  function autoSave(item: CaptureItem, durationSeconds?: number) {
+    if (!user || membership.status !== 'ready' || !membership.circleId) return;
+    const type = item.kind === 'video' ? 'video' : item.kind === 'audio' ? 'voice' : 'photo';
+    uploadBatchedMemories(
+      user,
+      membership.circleId,
+      [{
+        uri: item.uri,
+        groupId: destinationId,
+        takenAtMs: item.createdAt,
+        type,
+        durationSeconds,
+      }],
+      () => {},
+    )
+      .then((result) => {
+        const id = result.ids[0];
+        if (id) markSaved(item.id, id);
+      })
+      .catch((e) => console.error('Auto-save failed', e));
+  }
 
   const [facing, setFacing] = useState<Facing>('back');
   const [flash, setFlash] = useState<FlashMode>('auto');
@@ -97,7 +125,7 @@ export function CaptureScreen() {
     ]).start();
 
     const photo = await cameraRef.current?.takePictureAsync();
-    if (photo) addItem(photo.uri, 'photo');
+    if (photo) autoSave(addItem(photo.uri, 'photo'));
   }
 
   async function handleStartRecording() {
@@ -113,7 +141,7 @@ export function CaptureScreen() {
     // recording, and it has to stay in video mode until the file comes back.
     await new Promise((resolve) => setTimeout(resolve, 150));
     const video = await cameraRef.current?.recordAsync();
-    if (video) addItem(video.uri, 'video');
+    if (video) autoSave(addItem(video.uri, 'video'));
     setCameraMode('picture');
   }
 
@@ -148,7 +176,11 @@ export function CaptureScreen() {
   return (
     <View style={styles.container}>
       {voiceMode ? (
-        <VoiceRecorder onRecorded={(uri) => addItem(uri, 'audio')} />
+        <VoiceRecorder
+          onRecorded={(uri, durationMillis) =>
+            autoSave(addItem(uri, 'audio'), Math.round(durationMillis / 1000))
+          }
+        />
       ) : (
         <>
         <GestureDetector gesture={pinchGesture}>
@@ -164,7 +196,7 @@ export function CaptureScreen() {
             />
           </View>
         </GestureDetector>
-        
+
         </>
       )}
 
