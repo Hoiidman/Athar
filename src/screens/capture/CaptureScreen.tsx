@@ -124,7 +124,7 @@ export function CaptureScreen() {
       Animated.timing(shutterOpacity, { toValue: 0, duration: 240, useNativeDriver: true }),
     ]).start();
 
-    const photo = await cameraRef.current?.takePictureAsync();
+    const photo = await cameraRef.current?.takePictureAsync({ quality: 1 });
     if (photo) autoSave(addItem(photo.uri, 'photo'));
   }
 
@@ -193,6 +193,8 @@ export function CaptureScreen() {
               mode={cameraMode}
               zoom={zoom}
               mirror={facing === 'front'}
+              videoQuality="1080p"
+              videoStabilizationMode="auto"
             />
           </View>
         </GestureDetector>
