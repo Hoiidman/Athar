@@ -276,8 +276,6 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
         memories={memories}
         initialMemoryId={viewingMemory?.id ?? null}
         onClose={() => setViewingMemory(null)}
-        showDetails={false}
-        showMoveControl
         groups={groups}
       />
 
@@ -363,14 +361,14 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
         <Pressable style={styles.modalBackdrop} onPress={() => setMoveModalVisible(false)} />
         <View style={styles.modalSheet}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Move to Memory Group</Text>
+            <Text style={styles.modalTitle}>Move to Album</Text>
             <Pressable onPress={() => setMoveModalVisible(false)} style={styles.closeButton}>
               <Ionicons name="close" size={24} color={colors.textPrimary} />
             </Pressable>
           </View>
 
           {groups.length === 0 ? (
-            <Text style={styles.noGroupsText}>You don&apos;t have any Memory Groups yet.</Text>
+            <Text style={styles.noGroupsText}>You don&apos;t have any albums yet.</Text>
           ) : (
             <FlatList
               data={groups}

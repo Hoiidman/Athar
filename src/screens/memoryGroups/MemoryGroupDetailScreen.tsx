@@ -85,7 +85,7 @@ export function MemoryGroupDetailScreen({ groupId, circleId, navigation }: Memor
             <Ionicons name="images-outline" size={48} color={colors.textSecondary} />
             <Text style={styles.emptyTitle}>No memories yet</Text>
             <Text style={styles.emptySubtitle}>
-              Photos and videos added to this group will appear here.
+              Photos and videos added to this album will appear here.
             </Text>
           </View>
         }
@@ -113,14 +113,7 @@ export function MemoryGroupDetailScreen({ groupId, circleId, navigation }: Memor
         memories={memoriesState.status === 'ready' ? memoriesState.memories : []}
         initialMemoryId={viewingMemory?.id ?? null}
         onClose={() => setViewingMemory(null)}
-        showDetails={true}
-        getUploaderName={(uid) => {
-          if (overviewState.status === 'ready') {
-            const member = overviewState.members.find(m => m.userId === uid);
-            return member?.displayName ?? uid;
-          }
-          return uid;
-        }}
+        groups={groupsState.status === 'ready' ? groupsState.groups : []}
       />
     </SafeAreaView>
   );

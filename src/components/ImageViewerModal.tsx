@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Modal, View, Text,  StyleSheet, Pressable, ActivityIndicator, Alert, Dimensions, FlatList } from 'react-native';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { Modal, View, Text, StyleSheet, Pressable, ActivityIndicator, Alert, Dimensions, FlatList, Share } from 'react-native';
 import { useRef } from "react";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Memory, MemoryGroup } from '../types/memory';
 import { MY_SPACE_GROUP_ID } from '../types';
 import { colors, spacing, typography } from '../theme';
@@ -11,6 +15,7 @@ import { deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { firestore } from '../services/firebase';
 import { moveMemoryToGroup } from '../services/memories';
 import { AlbumPicker } from '../screens/capture/AlbumPicker';
+import type { RootStackParamList } from '../navigation/RootStackNavigator';
 
 
 function VideoItem({ uri }: { uri: string }) {
@@ -28,16 +33,39 @@ function VideoItem({ uri }: { uri: string }) {
   );
 }
 
+function formatDuration(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+  const total = Math.floor(seconds);
+  const minutes = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${minutes}:${String(secs).padStart(2, '0')}`;
+}
+
+function VoiceItem({ uri }: { uri: string }) {
+  const player = useAudioPlayer(uri);
+  const status = useAudioPlayerStatus(player);
+
+  return (
+    <View style={styles.voicePlayer}>
+      <Pressable
+        style={styles.voicePlayButton}
+        onPress={() => (status.playing ? player.pause() : player.play())}
+      >
+        <Ionicons name={status.playing ? 'pause' : 'play'} size={36} color="#fff" />
+      </Pressable>
+      <Text style={styles.voiceDuration}>
+        {formatDuration(status.currentTime)} / {formatDuration(status.duration)}
+      </Text>
+    </View>
+  );
+}
+
 const screenWidth = Dimensions.get('window').width;
 
 interface ImageViewerModalProps {
   memories: Memory[];
   initialMemoryId: string | null;
   onClose: () => void;
-  showDetails?: boolean;
-  getUploaderName?: (uid: string) => string;
-  /** Shows a "Move to <space>" control instead of editing tools. Used from the Timeline. */
-  showMoveControl?: boolean;
   groups?: MemoryGroup[];
 }
 
@@ -45,11 +73,10 @@ export function ImageViewerModal({
   memories,
   initialMemoryId,
   onClose,
-  showDetails = false,
-  getUploaderName,
-  showMoveControl = false,
   groups = [],
 }: ImageViewerModalProps) {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
   const [removing, setRemoving] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [movePickerVisible, setMovePickerVisible] = useState(false);
@@ -68,13 +95,13 @@ export function ImageViewerModal({
   }, [initialMemoryId, memories]);
 
   if (currentIndex === -1 || !memories[currentIndex]) return null;
-  
+
   const memory = memories[currentIndex];
 
-  async function handleRemove() {
-    Alert.alert('Remove Memory', 'Do you want to remove this memory from the group or delete it entirely?', [
+  function handleRemove() {
+    Alert.alert('Remove Memory', 'Do you want to remove this memory from the album or delete it entirely?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove from Group', onPress: async () => {
+      { text: 'Remove from Album', onPress: async () => {
           setRemoving(true);
           try {
             await updateDoc(doc(firestore, 'memories', memory.id), { memoryGroupId: 'my-space' });
@@ -82,7 +109,7 @@ export function ImageViewerModal({
             else setCurrentIndex(Math.max(0, currentIndex - 1));
           } catch (e) {
             console.error(e);
-            Alert.alert('Error', 'Failed to remove from group');
+            Alert.alert('Error', 'Failed to remove from album');
           } finally {
             setRemoving(false);
           }
@@ -103,9 +130,27 @@ export function ImageViewerModal({
     ]);
   }
 
+  async function handleShare() {
+    try {
+      await Share.share({ url: memory.storageUrl, message: 'From Athar' });
+    } catch {
+      Alert.alert('Could not share', 'Something went wrong sharing this memory.');
+    }
+  }
 
-
-
+  function handleEdit() {
+    // avoids stacking a second native modal underneath the editor
+    onClose();
+    navigation.navigate('MediaPreview', {
+      itemId: memory.id,
+      editMemory: {
+        memoryId: memory.id,
+        uri: memory.storageUrl,
+        kind: memory.type === 'video' ? 'video' : 'photo',
+        groupId: memory.memoryGroupId,
+      },
+    });
+  }
 
   async function handleMoveTo(groupId: string) {
     setMoving(true);
@@ -119,25 +164,22 @@ export function ImageViewerModal({
     }
   }
 
-  const uploadDate = new Date(memory.createdAt).toLocaleDateString();
-  const takenDate = memory.takenAt ? new Date(memory.takenAt).toLocaleDateString() : 'Unknown';
-  const uploaderName = getUploaderName ? getUploaderName(memory.uploadedBy) : memory.uploadedBy;
   const currentGroupLabel =
     memory.memoryGroupId === MY_SPACE_GROUP_ID
       ? 'My Space'
       : groups.find((g) => g.id === memory.memoryGroupId)?.title ?? 'Shared';
+  const editable = memory.type !== 'voice';
 
   return (
-    <>
     <Modal visible={true} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.container}>
         <View style={styles.header}>
           <Pressable onPress={onClose} style={styles.iconButton}>
             <Ionicons name="close" size={28} color="#fff" />
           </Pressable>
-          {showDetails && (
-            <Pressable onPress={handleRemove} style={styles.iconButton} disabled={removing}>
-              {removing ? <ActivityIndicator color="#fff" /> : <Ionicons name="trash" size={24} color="#ff4444" />}
+          {editable && (
+            <Pressable onPress={handleEdit} style={styles.iconButton}>
+              <Ionicons name="create-outline" size={26} color="#fff" />
             </Pressable>
           )}
         </View>
@@ -159,6 +201,8 @@ export function ImageViewerModal({
             <View style={{ width: screenWidth, height: '100%', justifyContent: 'center', alignItems: 'center' }}>
               {item.type === 'video' ? (
                 <VideoItem uri={item.storageUrl} />
+              ) : item.type === 'voice' ? (
+                <VoiceItem uri={item.storageUrl} />
               ) : (
                 <Image
                   source={{ uri: item.storageUrl }}
@@ -172,48 +216,53 @@ export function ImageViewerModal({
           )}
         />
 
-        {showDetails && (
-          <View style={styles.detailsPanel}>
-            <Text style={styles.detailText}>Uploaded by: {uploaderName}</Text>
-            <Text style={styles.detailText}>Uploaded on: {uploadDate}</Text>
-            <Text style={styles.detailText}>Taken on: {takenDate}</Text>
-          </View>
-        )}
+        <View style={[styles.actionBar, { paddingBottom: insets.bottom + spacing.sm }]}>
+          <Pressable style={styles.actionButton} onPress={handleShare}>
+            <Ionicons name="share-outline" size={22} color="#fff" />
+            <Text style={styles.actionLabel}>Share</Text>
+          </Pressable>
 
-        {showMoveControl && (
-          <View style={styles.moveBar}>
-            <Pressable
-              style={styles.moveButton}
-              onPress={() => setMovePickerVisible(true)}
-              disabled={moving}
-            >
-              {moving ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="albums-outline" size={18} color="#fff" />
-                  <Text style={styles.moveButtonText} numberOfLines={1}>
-                    Move to {currentGroupLabel}
-                  </Text>
-                  <Ionicons name="chevron-down" size={16} color="#fff" />
-                </>
-              )}
-            </Pressable>
-          </View>
+          <Pressable
+            style={styles.actionButton}
+            onPress={() => setMovePickerVisible(true)}
+            disabled={moving}
+          >
+            {moving ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="albums-outline" size={22} color="#fff" />
+                <Text style={styles.actionLabel} numberOfLines={1}>
+                  {currentGroupLabel}
+                </Text>
+              </>
+            )}
+          </Pressable>
+
+          <Pressable style={styles.actionButton} onPress={handleRemove} disabled={removing}>
+            {removing ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="trash-outline" size={22} color="#ff4444" />
+                <Text style={[styles.actionLabel, styles.actionLabelDanger]}>Delete</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
+
+        {movePickerVisible && (
+          <AlbumPicker
+            visible={movePickerVisible}
+            onClose={() => setMovePickerVisible(false)}
+            selectedId={memory.memoryGroupId}
+            onSelect={(groupId) => handleMoveTo(groupId)}
+            title="Move to"
+            inline
+          />
         )}
       </View>
     </Modal>
-
-    {showMoveControl && (
-      <AlbumPicker
-        visible={movePickerVisible}
-        onClose={() => setMovePickerVisible(false)}
-        selectedId={memory.memoryGroupId}
-        onSelect={(groupId) => handleMoveTo(groupId)}
-        title="Move to"
-      />
-    )}
-    </>
   );
 }
 
@@ -259,43 +308,44 @@ const styles = StyleSheet.create({
   navRight: {
     right: spacing.sm,
   },
-  detailsPanel: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: spacing.lg,
-    paddingBottom: 40,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-  },
-  detailText: {
-    ...typography.body,
-    color: '#fff',
-    marginBottom: spacing.xs,
-  },
-  moveBar: {
+  actionBar: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    alignItems: 'center',
-    paddingBottom: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     paddingTop: spacing.md,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  moveButton: {
-    flexDirection: 'row',
+  actionButton: {
     alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 24,
-    maxWidth: '80%',
+    gap: 4,
+    maxWidth: '33%',
   },
-  moveButtonText: {
+  actionLabel: {
+    ...typography.caption,
+    color: '#fff',
+  },
+  actionLabelDanger: {
+    color: '#ff4444',
+  },
+  voicePlayer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+  },
+  voicePlayButton: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voiceDuration: {
     ...typography.body,
     color: '#fff',
-    flexShrink: 1,
+    fontVariant: ['tabular-nums'],
   },
 });
