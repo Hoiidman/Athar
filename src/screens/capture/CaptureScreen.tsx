@@ -77,6 +77,7 @@ export function CaptureScreen() {
   const [albumPickerVisible, setAlbumPickerVisible] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [zoom, setZoom] = useState(0);
+  const [gridEnabled, setGridEnabled] = useState(false);
 
   const cameraRef = useRef<CameraView>(null);
   const shutterOpacity = useRef(new Animated.Value(0)).current;
@@ -199,6 +200,14 @@ export function CaptureScreen() {
           </View>
         </GestureDetector>
 
+        {gridEnabled && (
+          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+            <View style={[styles.gridLineVertical, { left: '33.33%' }]} />
+            <View style={[styles.gridLineVertical, { left: '66.66%' }]} />
+            <View style={[styles.gridLineHorizontal, { top: '33.33%' }]} />
+            <View style={[styles.gridLineHorizontal, { top: '66.66%' }]} />
+          </View>
+        )}
         </>
       )}
 
@@ -209,9 +218,14 @@ export function CaptureScreen() {
 
       {!voiceMode && (
         <SafeAreaView style={styles.topBar} edges={['top']}>
-          <Pressable onPress={cycleFlash} style={styles.iconButton} hitSlop={10}>
-            <Ionicons name={FLASH_ICONS[flash]} size={30} color={colors.surface} />
-          </Pressable>
+          <View style={styles.topBarGroup}>
+            <Pressable onPress={cycleFlash} style={styles.iconButton} hitSlop={10}>
+              <Ionicons name={FLASH_ICONS[flash]} size={28} color={colors.surface} />
+            </Pressable>
+            <Pressable onPress={() => setGridEnabled((g) => !g)} style={styles.iconButton} hitSlop={10}>
+              <Ionicons name="grid-outline" size={26} color={gridEnabled ? colors.primary : colors.surface} />
+            </Pressable>
+          </View>
           <Pressable
             onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}
             style={styles.iconButton}
@@ -334,6 +348,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.sm,
     paddingTop: spacing.xs,
+  },
+  topBarGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  gridLineVertical: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  gridLineHorizontal: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.5)',
   },
   bottomBar: {
     position: 'absolute',
