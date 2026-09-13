@@ -17,9 +17,11 @@ interface Props {
   onSelect: (id: string, label: string) => void;
   /** Sheet heading — defaults to "Save to". */
   title?: string;
+  /** Renders the sheet without its own <Modal> wrapper, for use inside a caller that's already a Modal (nesting two native Modals breaks touch handling on Android). */
+  inline?: boolean;
 }
 
-export function AlbumPicker({ visible, onClose, selectedId, onSelect, title = 'Save to' }: Props) {
+export function AlbumPicker({ visible, onClose, selectedId, onSelect, title = 'Save to', inline = false }: Props) {
   const { user } = useAuth();
   const { state: membership } = useFamilyCircleMembership(user);
   const circleId = membership.status === 'ready' ? membership.circleId : null;
@@ -75,33 +77,41 @@ export function AlbumPicker({ visible, onClose, selectedId, onSelect, title = 'S
     onClose();
   }
 
-  return (
-    <Modal visible={mounted} transparent animationType="none" onRequestClose={onClose}>
-      <View style={styles.container}>
-        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        </Animated.View>
+  if (!mounted) return null;
 
-        <Animated.View style={[styles.sheet, { transform: [{ translateY: sheetOffset }] }]}>
-          <View style={styles.grabber} />
-          <Text style={styles.title}>{title}</Text>
-          {albums.map((album) => (
-            <Pressable
-              key={album.id}
-              style={styles.row}
-              onPress={() => select(album.id, album.label)}
-            >
-              <Text style={styles.label}>{album.label}</Text>
-              {selectedId === album.id && (
-                <Ionicons name="checkmark" size={20} color={colors.primary} />
-              )}
-            </Pressable>
-          ))}
-          {groupsState.status === 'loading' && circleId && (
-            <ActivityIndicator style={styles.loading} color={colors.primary} />
-          )}
-        </Animated.View>
-      </View>
+  const sheet = (
+    <View style={[styles.container, inline && styles.containerInline]}>
+      <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      </Animated.View>
+
+      <Animated.View style={[styles.sheet, { transform: [{ translateY: sheetOffset }] }]}>
+        <View style={styles.grabber} />
+        <Text style={styles.title}>{title}</Text>
+        {albums.map((album) => (
+          <Pressable
+            key={album.id}
+            style={styles.row}
+            onPress={() => select(album.id, album.label)}
+          >
+            <Text style={styles.label}>{album.label}</Text>
+            {selectedId === album.id && (
+              <Ionicons name="checkmark" size={20} color={colors.primary} />
+            )}
+          </Pressable>
+        ))}
+        {groupsState.status === 'loading' && circleId && (
+          <ActivityIndicator style={styles.loading} color={colors.primary} />
+        )}
+      </Animated.View>
+    </View>
+  );
+
+  if (inline) return sheet;
+
+  return (
+    <Modal visible transparent animationType="none" onRequestClose={onClose}>
+      {sheet}
     </Modal>
   );
 }
@@ -110,6 +120,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  containerInline: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 20,
+    elevation: 20,
   },
   backdrop: {
     ...StyleSheet.absoluteFill,
