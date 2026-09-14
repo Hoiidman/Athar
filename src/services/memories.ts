@@ -102,7 +102,8 @@ async function uploadSingleMemory(user: User, circleId: string, photo: Uploadabl
     caption: null,
     transcript: null,
     aiStory: null,
-    aiStatus: 'not_applicable', // Auto-Categorization doesn't necessarily trigger AI unless specified
+    aiStatus: photo.type === 'photo' ? 'pending' : 'not_applicable',
+    embedding: null,
     categorizationMethod: 'auto',
     includeInSlideshow: true,
     createdAt: serverTimestamp(),

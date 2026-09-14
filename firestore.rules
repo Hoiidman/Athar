@@ -284,8 +284,8 @@ service cloud.firestore {
     function memoryFields() {
       return ['familyCircleId', 'memoryGroupId', 'visibility', 'type', 'storageUrl',
               'thumbnailUrl', 'durationSeconds', 'takenAt', 'uploadedBy', 'caption',
-              'transcript', 'aiStory', 'aiStatus', 'categorizationMethod', 'includeInSlideshow',
-              'createdAt', 'updatedAt'];
+              'transcript', 'aiStory', 'aiStatus', 'embedding', 'categorizationMethod',
+              'includeInSlideshow', 'createdAt', 'updatedAt'];
     }
 
     function isValidMemory(data) {
@@ -308,6 +308,7 @@ service cloud.firestore {
         && (data.transcript == null || data.transcript is string)
         && (data.aiStory == null || data.aiStory is string)
         && data.aiStatus in ['pending', 'success', 'failed', 'offline_fallback', 'not_applicable']
+        && (data.embedding == null || data.embedding is list)
         && data.categorizationMethod in ['auto', 'manual', 'default']
         && data.includeInSlideshow is bool
         && data.createdAt is timestamp
@@ -329,7 +330,8 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time
         // Clients cannot set AI fields
         && request.resource.data.aiStory == null
-        && request.resource.data.aiStatus in ['pending', 'not_applicable'];
+        && request.resource.data.aiStatus in ['pending', 'not_applicable']
+        && request.resource.data.embedding == null;
 
       allow update: if isSignedIn()
         && isValidMemory(request.resource.data)
@@ -341,7 +343,8 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time
         // Clients cannot modify AI fields
         && request.resource.data.aiStory == resource.data.aiStory
-        && request.resource.data.aiStatus == resource.data.aiStatus;
+        && request.resource.data.aiStatus == resource.data.aiStatus
+        && request.resource.data.embedding == resource.data.embedding;
 
       allow delete: if isSignedIn() && inCircle(resource.data.familyCircleId);
     }

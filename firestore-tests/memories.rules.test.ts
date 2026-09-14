@@ -74,6 +74,7 @@ beforeEach(async () => {
       transcript: null,
       aiStory: null,
       aiStatus: 'not_applicable',
+      embedding: null,
       categorizationMethod: 'default',
       includeInSlideshow: true,
       createdAt: serverTimestamp(),
@@ -94,6 +95,7 @@ beforeEach(async () => {
       transcript: null,
       aiStory: null,
       aiStatus: 'not_applicable',
+      embedding: null,
       categorizationMethod: 'default',
       includeInSlideshow: true,
       createdAt: serverTimestamp(),
@@ -144,6 +146,7 @@ describe('memories rules', () => {
       transcript: null,
       aiStory: null,
       aiStatus: 'not_applicable',
+      embedding: null,
       categorizationMethod: 'default',
       includeInSlideshow: true,
       createdAt: serverTimestamp(),
@@ -165,6 +168,22 @@ describe('memories rules', () => {
       const db = dbFor(MEMBER_1);
       const badMemory = { ...validMemory, aiStory: 'Hacked', aiStatus: 'success' };
       await assertFails(setDoc(doc(db, 'memories', 'hacked-mem'), badMemory));
+    });
+
+    it('denies setting an embedding on create', async () => {
+      const db = dbFor(MEMBER_1);
+      const badMemory = { ...validMemory, embedding: [0.1, 0.2, 0.3] };
+      await assertFails(setDoc(doc(db, 'memories', 'hacked-embedding'), badMemory));
+    });
+
+    it('denies a member from writing their own embedding on update', async () => {
+      const db = dbFor(MEMBER_1);
+      await assertFails(
+        updateDoc(doc(db, 'memories', 'shared-mem'), {
+          embedding: [0.1, 0.2, 0.3],
+          updatedAt: serverTimestamp(),
+        })
+      );
     });
 
     it('allows a member to update their own memory', async () => {
