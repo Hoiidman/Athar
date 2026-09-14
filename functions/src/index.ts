@@ -4,3 +4,4 @@ initializeApp();
 
 export { enrichMemory } from './enrichMemory';
 export { backfillEmbeddings } from './backfillEmbeddings';
+export { searchMemories } from './searchMemories';
