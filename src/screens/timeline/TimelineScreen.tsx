@@ -19,7 +19,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { User } from 'firebase/auth';
+import type { RootStackParamList } from '../../navigation/RootStackNavigator';
 import { useMySpaceMemories } from '../../hooks/useMySpaceMemories';
 import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
@@ -46,6 +49,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 export function TimelineScreen({ user }: TimelineScreenProps) {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { state: membershipState } = useFamilyCircleMembership(user);
   const circleId = membershipState.status === 'ready' ? membershipState.circleId : null;
   const { state: overviewState } = useFamilyCircleOverview(circleId);
@@ -209,7 +213,12 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
               : `${photoCount} ${photoCount === 1 ? 'memory' : 'memories'}`}
           </Text>
         </View>
-        <Ionicons name="lock-closed" size={18} color={colors.sageIcon} />
+        <View style={styles.headerActions}>
+          <Pressable onPress={() => navigation.navigate('Search')} hitSlop={8}>
+            <Ionicons name="search" size={20} color={colors.sageIcon} />
+          </Pressable>
+          <Ionicons name="lock-closed" size={18} color={colors.sageIcon} />
+        </View>
       </View>
 
       <FlatList
@@ -413,6 +422,11 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   centered: {
     alignItems: 'center',

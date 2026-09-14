@@ -2,6 +2,7 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootTabNavigator, type RootTabParamList } from './RootTabNavigator';
 import { MediaPreviewScreen } from '../screens/preview/MediaPreviewScreen';
+import { SearchScreen } from '../screens/search/SearchScreen';
 
 export interface EditMemoryParam {
   memoryId: string;
@@ -13,6 +14,7 @@ export interface EditMemoryParam {
 export type RootStackParamList = {
   Tabs: NavigatorScreenParams<RootTabParamList> | undefined;
   MediaPreview: { itemId: string; editMemory?: EditMemoryParam };
+  Search: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -25,6 +27,11 @@ export function RootStackNavigator() {
         name="MediaPreview"
         component={MediaPreviewScreen}
         options={{ presentation: 'fullScreenModal', animation: 'fade' }}
+      />
+      <Stack.Screen
+        name="Search"
+        component={SearchScreen}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
     </Stack.Navigator>
   );
