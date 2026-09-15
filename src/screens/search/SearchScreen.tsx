@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   FlatList,
   Pressable,
   StyleSheet,
@@ -18,7 +17,7 @@ import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership
 import { useMemoryGroups } from '../../hooks/useMemoryGroups';
 import { searchMemories, type SearchResultMemory } from '../../services/ai';
 import type { Memory } from '../../types/memory';
-import { colors, spacing, typography } from '../../theme';
+import { cardCornerRadius, cardShadow, colors, spacing, typography } from '../../theme';
 import { SearchInput } from '../../components/SearchInput';
 import { EmptyState } from '../../components/EmptyState';
 import { ImageViewerModal } from '../../components/ImageViewerModal';
@@ -29,9 +28,7 @@ type SearchState =
   | { status: 'error'; message: string }
   | { status: 'ready'; results: SearchResultMemory[] };
 
-const numColumns = 3;
-const screenWidth = Dimensions.get('window').width;
-const imageSize = screenWidth / numColumns;
+const THUMBNAIL_SIZE = 72;
 
 // ImageViewerModal only ever reads id/storageUrl/type/memoryGroupId off each
 // item (plus `groups` to resolve a display label) — every other Memory field
@@ -139,30 +136,39 @@ export function SearchScreen() {
       {state.status === 'ready' && state.results.length > 0 && (
         <FlatList
           data={state.results}
-          numColumns={numColumns}
           keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          ItemSeparatorComponent={() => <View style={{ height: spacing.xs }} />}
           renderItem={({ item }) => (
             <Pressable
-              style={styles.imageContainer}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => setViewingMemory(toMemory(item, circleId ?? ''))}
             >
-              <Image
-                source={{ uri: item.thumbnailUrl ?? item.storageUrl }}
-                style={styles.image}
-                contentFit="cover"
-                transition={200}
-                cachePolicy="memory-disk"
-              />
-              {item.type === 'video' && (
-                <View style={styles.iconOverlay}>
-                  <Ionicons name="play-circle" size={24} color="#fff" />
-                </View>
-              )}
-              {item.type === 'voice' && (
-                <View style={styles.iconOverlay}>
-                  <Ionicons name="mic" size={24} color="#fff" />
-                </View>
-              )}
+              <View style={styles.thumbnailWrap}>
+                <Image
+                  source={{ uri: item.thumbnailUrl ?? item.storageUrl }}
+                  style={styles.thumbnail}
+                  contentFit="cover"
+                  transition={200}
+                  cachePolicy="memory-disk"
+                />
+                {item.type === 'video' && (
+                  <View style={styles.iconOverlay}>
+                    <Ionicons name="play-circle" size={20} color="#fff" />
+                  </View>
+                )}
+                {item.type === 'voice' && (
+                  <View style={styles.iconOverlay}>
+                    <Ionicons name="mic" size={20} color="#fff" />
+                  </View>
+                )}
+              </View>
+              <Text
+                style={[styles.caption, !item.aiStory && styles.captionMuted]}
+                numberOfLines={3}
+              >
+                {item.aiStory ?? 'No description yet'}
+              </Text>
             </Pressable>
           )}
         />
@@ -209,13 +215,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
   },
-  imageContainer: {
-    width: imageSize,
-    height: imageSize,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.background,
+  list: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
   },
-  image: {
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: cardCornerRadius,
+    padding: spacing.xs,
+    ...cardShadow,
+  },
+  rowPressed: {
+    opacity: 0.7,
+  },
+  thumbnailWrap: {
+    width: THUMBNAIL_SIZE,
+    height: THUMBNAIL_SIZE,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  thumbnail: {
     width: '100%',
     height: '100%',
   },
@@ -225,5 +247,14 @@ const styles = StyleSheet.create({
     right: 4,
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 12,
+  },
+  caption: {
+    ...typography.body,
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  captionMuted: {
+    color: colors.textSecondary,
+    fontStyle: 'italic',
   },
 });
