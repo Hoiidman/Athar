@@ -28,7 +28,7 @@ type SearchState =
   | { status: 'error'; message: string }
   | { status: 'ready'; results: SearchResultMemory[] };
 
-const THUMBNAIL_SIZE = 72;
+const THUMBNAIL_SIZE = 104;
 
 // ImageViewerModal only ever reads id/storageUrl/type/memoryGroupId off each
 // item (plus `groups` to resolve a display label) — every other Memory field
@@ -163,12 +163,15 @@ export function SearchScreen() {
                   </View>
                 )}
               </View>
-              <Text
-                style={[styles.caption, !item.aiStory && styles.captionMuted]}
-                numberOfLines={3}
-              >
-                {item.aiStory ?? 'No description yet'}
-              </Text>
+              <View style={styles.captionColumn}>
+                <Text
+                  style={[styles.caption, !item.aiStory && styles.captionMuted]}
+                  numberOfLines={4}
+                >
+                  {item.aiStory ?? 'No description yet'}
+                </Text>
+                <Text style={styles.confidence}>{item.confidence}% match</Text>
+              </View>
             </Pressable>
           )}
         />
@@ -194,7 +197,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
   },
   title: {
@@ -248,13 +251,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 12,
   },
+  captionColumn: {
+    flex: 1,
+    gap: 4,
+  },
   caption: {
     ...typography.body,
     color: colors.textPrimary,
-    flex: 1,
   },
   captionMuted: {
     color: colors.textSecondary,
     fontStyle: 'italic',
+  },
+  confidence: {
+    ...typography.caption,
+    color: colors.textSecondary,
   },
 });

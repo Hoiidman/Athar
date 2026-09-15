@@ -9,6 +9,7 @@ export interface SearchResultMemory {
   aiStory: string | null;
   takenAt: number | null;
   memoryGroupId: string;
+  confidence: number;
 }
 
 const searchMemoriesCallable = httpsCallable<

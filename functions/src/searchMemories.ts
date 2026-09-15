@@ -4,11 +4,14 @@ import { GoogleGenAI } from '@google/genai';
 import { embedText } from './geminiEnrichment';
 import { GEMINI_API_KEY } from './enrichMemory';
 
-const RESULT_LIMIT = 20;
+const RESULT_LIMIT = 8;
 // Over-fetch before the privacy post-filter below, so a search doesn't come
 // back with fewer than RESULT_LIMIT just because some of a circle's nearest
 // matches happen to be another member's private items.
-const CANDIDATE_LIMIT = 60;
+const CANDIDATE_LIMIT = 30;
+// COSINE distance = 1 - similarity; drop anything below ~0.35 similarity.
+// Starting point, not empirically tuned yet.
+const MAX_DISTANCE = 0.65;
 
 interface SearchRequest {
   query: string;
@@ -24,6 +27,7 @@ interface MemoryDoc {
   aiStory: string | null;
   takenAt: FirebaseFirestore.Timestamp | null;
   memoryGroupId: string;
+  __distance?: number;
 }
 
 export const searchMemories = onCall<SearchRequest>(
@@ -59,6 +63,8 @@ export const searchMemories = onCall<SearchRequest>(
         queryVector: queryEmbedding,
         limit: CANDIDATE_LIMIT,
         distanceMeasure: 'COSINE',
+        distanceResultField: '__distance',
+        distanceThreshold: MAX_DISTANCE,
       })
       .get();
 
@@ -74,6 +80,7 @@ export const searchMemories = onCall<SearchRequest>(
         aiStory: memory.aiStory ?? null,
         takenAt: memory.takenAt?.toMillis?.() ?? null,
         memoryGroupId: memory.memoryGroupId,
+        confidence: Math.round(Math.max(0, 1 - (memory.__distance ?? 1)) * 100),
       }));
 
     return { results };
