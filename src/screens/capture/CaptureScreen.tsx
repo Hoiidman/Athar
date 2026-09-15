@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { CameraView } from 'expo-camera';
@@ -180,7 +180,7 @@ export function CaptureScreen() {
       Animated.timing(shutterOpacity, { toValue: 0, duration: 240, useNativeDriver: true }),
     ]).start();
 
-    const photo = await cameraRef.current?.takePictureAsync({ quality: 1 });
+    const photo = await cameraRef.current?.takePictureAsync({ quality: 0.85 });
     if (photo) saveItem(addItem(photo.uri, 'photo'));
   }
 
@@ -390,6 +390,11 @@ export function CaptureScreen() {
                   </View>
                 )}
                 {!lastMedia && <View style={styles.thumbnailPlaceholder} />}
+                {lastMedia && !lastMedia.savedMemoryId && (
+                  <View style={styles.thumbnailSavingOverlay}>
+                    <ActivityIndicator size="small" color={colors.surface} />
+                  </View>
+                )}
               </Pressable>
             </Animated.View>
           )}
@@ -571,5 +576,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
+  },
+  thumbnailSavingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
