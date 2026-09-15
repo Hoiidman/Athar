@@ -4,6 +4,36 @@ import type { User } from 'firebase/auth';
 import { MY_SPACE_GROUP_ID } from '../types';
 import { firestore, storage } from './firebase';
 
+// A React Native file:// blob's own `.type` is frequently blank, which
+// Storage then serves back as application/octet-stream — Gemini can't decode
+// that as an image and silently hallucinates a caption instead of erroring.
+// Setting this explicitly from the file extension keeps the stored
+// Content-Type correct regardless of what the local blob reports.
+function contentTypeForExtension(ext: string): string {
+  switch (ext) {
+    case 'png':
+      return 'image/png';
+    case 'webp':
+      return 'image/webp';
+    case 'heic':
+      return 'image/heic';
+    case 'heif':
+      return 'image/heif';
+    case 'mp4':
+      return 'video/mp4';
+    case 'mov':
+      return 'video/quicktime';
+    case 'm4a':
+      return 'audio/m4a';
+    case 'caf':
+      return 'audio/x-caf';
+    case 'jpg':
+    case 'jpeg':
+    default:
+      return 'image/jpeg';
+  }
+}
+
 export async function moveMemoryToGroup(memoryId: string, targetGroupId: string) {
   const memoryRef = doc(firestore, 'memories', memoryId);
 
@@ -27,7 +57,7 @@ export async function replaceMemoryMedia(user: User, memoryId: string, uri: stri
   const storagePath = `memories/${user.uid}/${uniqueId}.${fileExtension}`;
   const storageRef = ref(storage, storagePath);
 
-  await uploadBytes(storageRef, blob);
+  await uploadBytes(storageRef, blob, { contentType: contentTypeForExtension(fileExtension) });
   const downloadUrl = await getDownloadURL(storageRef);
 
   await updateDoc(doc(firestore, 'memories', memoryId), {
@@ -69,7 +99,7 @@ async function uploadSingleMemory(user: User, circleId: string, photo: Uploadabl
   const storageRef = ref(storage, storagePath);
 
   // 3. Upload to Firebase Storage
-  await uploadBytes(storageRef, blob);
+  await uploadBytes(storageRef, blob, { contentType: contentTypeForExtension(fileExtension) });
   const downloadUrl = await getDownloadURL(storageRef);
 
   let thumbnailUrl: string | null = null;
@@ -79,7 +109,7 @@ async function uploadSingleMemory(user: User, circleId: string, photo: Uploadabl
       const thumbBlob = await thumbResponse.blob();
       const thumbStoragePath = `memories/${user.uid}/thumb_${uniqueId}.jpg`;
       const thumbStorageRef = ref(storage, thumbStoragePath);
-      await uploadBytes(thumbStorageRef, thumbBlob);
+      await uploadBytes(thumbStorageRef, thumbBlob, { contentType: 'image/jpeg' });
       thumbnailUrl = await getDownloadURL(thumbStorageRef);
     } catch (e) {
       console.warn("Failed to upload video thumbnail", e);
