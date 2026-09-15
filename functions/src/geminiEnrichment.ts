@@ -7,12 +7,15 @@ import { ApiError, GoogleGenAI } from '@google/genai';
 export const EMBEDDING_DIMENSION = 768;
 
 const DESCRIPTION_PROMPT =
-  'Describe only what is literally visible in this exact image, in one factual ' +
-  'sentence (max 20 words) — name concrete people, objects, setting, and any evident ' +
-  "occasion. If the image is blank, solid-colored, too dark, or you can't make out " +
-  'its contents, say so plainly instead of guessing. This caption is shown to the ' +
-  "user as-is and matched against their search text, so it must describe this " +
-  'specific image only — never a generic or plausible-sounding guess.';
+  'Describe only what is literally visible in this exact image, in one or two ' +
+  'concise sentences — name concrete people, objects, setting, and any evident ' +
+  'occasion. If any text appears anywhere in the image (a sign, banner, cake, ' +
+  't-shirt, whiteboard, caption, etc.), transcribe it verbatim and include it, ' +
+  "since a user may search for that exact text. If the image is blank, " +
+  "solid-colored, too dark, or you can't make out its contents, say so plainly " +
+  'instead of guessing. This caption is shown to the user as-is and matched ' +
+  'against their search text, so it must describe this specific image only — ' +
+  'never a generic or plausible-sounding guess.';
 
 const RETRY_DELAYS_MS = [1000, 3000]; // 2 retries: fits well inside a 60s function timeout
 
