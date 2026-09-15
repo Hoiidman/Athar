@@ -162,16 +162,16 @@ export function SearchScreen() {
                     <Ionicons name="mic" size={20} color="#fff" />
                   </View>
                 )}
+                <View style={styles.confidenceBadge}>
+                  <Text style={styles.confidenceText}>{item.confidence}%</Text>
+                </View>
               </View>
-              <View style={styles.captionColumn}>
-                <Text
-                  style={[styles.caption, !item.aiStory && styles.captionMuted]}
-                  numberOfLines={4}
-                >
-                  {item.aiStory ?? 'No description yet'}
-                </Text>
-                <Text style={styles.confidence}>{item.confidence}% match</Text>
-              </View>
+              <Text
+                style={[styles.caption, !item.aiStory && styles.captionMuted]}
+                numberOfLines={4}
+              >
+                {item.aiStory ?? 'No description yet'}
+              </Text>
             </Pressable>
           )}
         />
@@ -251,20 +251,28 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 12,
   },
-  captionColumn: {
-    flex: 1,
-    gap: 4,
+  confidenceBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  confidenceText: {
+    ...typography.caption,
+    fontSize: 11,
+    color: '#fff',
+    fontVariant: ['tabular-nums'],
   },
   caption: {
     ...typography.body,
     color: colors.textPrimary,
+    flex: 1,
   },
   captionMuted: {
     color: colors.textSecondary,
     fontStyle: 'italic',
-  },
-  confidence: {
-    ...typography.caption,
-    color: colors.textSecondary,
   },
 });
