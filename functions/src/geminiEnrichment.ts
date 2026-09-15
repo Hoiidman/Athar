@@ -38,11 +38,27 @@ function normalizeImageMimeType(mimeType: string): string {
   return SUPPORTED_IMAGE_MIME_TYPES.has(mimeType) ? mimeType : 'image/jpeg';
 }
 
+// ApiError's message is the raw JSON-stringified error body.
+function isDailyQuotaExhausted(err: ApiError): boolean {
+  try {
+    const body = JSON.parse(err.message) as {
+      error?: { details?: { ['@type']?: string; violations?: { quotaId?: string }[] }[] };
+    };
+    const violations = body.error?.details?.find((d) =>
+      d['@type']?.includes('QuotaFailure'),
+    )?.violations;
+    return Boolean(violations?.some((v) => v.quotaId?.includes('PerDay')));
+  } catch {
+    return false;
+  }
+}
+
 function isTransient(err: unknown): boolean {
-  // 503 UNAVAILABLE ("high demand") and 429 RESOURCE_EXHAUSTED are the two
-  // Gemini errors worth retrying — everything else (bad input, 404s) will
-  // just fail the same way again.
-  return err instanceof ApiError && (err.status === 503 || err.status === 429);
+  if (!(err instanceof ApiError)) return false;
+  if (err.status === 503) return true;
+  // A per-minute 429 is worth retrying; a per-day quota cap isn't.
+  if (err.status === 429) return !isDailyQuotaExhausted(err);
+  return false;
 }
 
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
