@@ -43,6 +43,13 @@ const numColumns = 3;
 const screenWidth = Dimensions.get('window').width;
 const imageSize = screenWidth / numColumns;
 
+function formatDuration(seconds: number) {
+  const total = Math.round(seconds);
+  const minutes = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${minutes}:${String(secs).padStart(2, '0')}`;
+}
+
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -267,6 +274,11 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
                 <Ionicons name="mic" size={24} color="#fff" />
               </View>
             )}
+            {item.type === 'voice' && item.durationSeconds != null && (
+              <View style={styles.durationBadge}>
+                <Text style={styles.durationText}>{formatDuration(item.durationSeconds)}</Text>
+              </View>
+            )}
             {isSelected && (
               <View style={[styles.iconOverlay, { backgroundColor: colors.primary, borderRadius: 12, padding: 2 }]}>
                 <Ionicons name="checkmark" size={20} color="#fff" />
@@ -469,6 +481,21 @@ const styles = StyleSheet.create({
     right: 4,
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 12,
+  },
+  durationBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  durationText: {
+    ...typography.caption,
+    fontSize: 11,
+    color: '#fff',
+    fontVariant: ['tabular-nums'],
   },
   modalBackdrop: {
     flex: 1,
