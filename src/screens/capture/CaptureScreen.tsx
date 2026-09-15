@@ -148,15 +148,19 @@ export function CaptureScreen() {
     applyZoom(0);
   }
 
+  function loadAvailableLenses() {
+    cameraRef.current
+      ?.getAvailableLensesAsync()
+      .then(setAvailableLenses)
+      .catch(() => setAvailableLenses([]));
+  }
+
   useEffect(() => {
     if (facing !== 'back') {
       setSelectedLens(undefined);
       return;
     }
-    cameraRef.current
-      ?.getAvailableLensesAsync()
-      .then(setAvailableLenses)
-      .catch(() => setAvailableLenses([]));
+    loadAvailableLenses();
   }, [facing]);
 
   useEffect(() => {
@@ -285,6 +289,7 @@ export function CaptureScreen() {
               videoQuality="1080p"
               videoStabilizationMode="auto"
               selectedLens={selectedLens}
+              onCameraReady={loadAvailableLenses}
             />
           </View>
         </GestureDetector>
