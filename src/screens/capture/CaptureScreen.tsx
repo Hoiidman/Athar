@@ -47,21 +47,20 @@ export function CaptureScreen() {
   const { destinationId, destinationLabel, setDestination } = useCaptureDestinationStore();
   const items = useCaptureSessionStore((state) => state.items);
   const addItem = useCaptureSessionStore((state) => state.addItem);
+  const claimForSaving = useCaptureSessionStore((state) => state.claimForSaving);
+  const unclaimSaving = useCaptureSessionStore((state) => state.unclaimSaving);
   const markSaved = useCaptureSessionStore((state) => state.markSaved);
   const { user } = useAuth();
   const { state: membership } = useFamilyCircleMembership(user);
   const circleId = membership.status === 'ready' ? membership.circleId : null;
 
-  // Items that have started an upload but haven't resolved yet, so the flush
-  // effect below doesn't fire a second upload for the same item while the
-  // first one is still in flight.
-  const savingIdsRef = useRef<Set<string>>(new Set());
-
   function saveItem(item: CaptureItem) {
     if (!user || !circleId) return;
-    if (item.savedMemoryId || savingIdsRef.current.has(item.id)) return;
+    // Claiming lives in the store (not a component ref) so this can't be
+    // defeated by the screen remounting between the immediate call below and
+    // a later retry from the flush effect.
+    if (!claimForSaving(item.id)) return;
 
-    savingIdsRef.current.add(item.id);
     const type = item.kind === 'video' ? 'video' : item.kind === 'audio' ? 'voice' : 'photo';
     uploadBatchedMemories(
       user,
@@ -78,9 +77,12 @@ export function CaptureScreen() {
       .then((result) => {
         const id = result.ids[0];
         if (id) markSaved(item.id, id);
+        else unclaimSaving(item.id);
       })
-      .catch((e) => console.error('Auto-save failed', e))
-      .finally(() => savingIdsRef.current.delete(item.id));
+      .catch((e) => {
+        console.error('Auto-save failed', e);
+        unclaimSaving(item.id);
+      });
   }
 
   // Capturing right as the screen opens can beat the family-circle membership
