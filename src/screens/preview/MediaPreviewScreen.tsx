@@ -802,13 +802,9 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
   function handleSaveEdit() {
     if (busy || !selected) return;
 
-    // Nothing to override when there's nothing different from the saved
-    // memory — offering it would just re-upload an identical copy.
+    // Already exactly as saved — nothing to do, just close out.
     if (!edited) {
-      Alert.alert('Save changes', 'Save this as a new memory?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Create New', onPress: () => finalizeEdit('new') },
-      ]);
+      navigation.goBack();
       return;
     }
 
