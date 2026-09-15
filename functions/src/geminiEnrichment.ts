@@ -16,7 +16,7 @@ export async function generateDescription(
   mimeType: string,
 ): Promise<string> {
   const result = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.6-flash',
     contents: [
       {
         role: 'user',
