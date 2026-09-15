@@ -29,6 +29,18 @@ export function CaptureButton({
   const stopProgress = useRef(new Animated.Value(0)).current;
   const loopRef = useRef<Animated.CompositeAnimation | null>(null);
 
+  // The PanResponder below is built once (via useRef) so gesture handling
+  // stays stable across renders, but that means its callbacks would
+  // otherwise close over whichever onTakePhoto/etc. were passed in on the
+  // very first render — permanently, even as the props keep changing (e.g.
+  // CaptureScreen's timerSeconds-aware handleTakePhoto). Routing every call
+  // through a ref that's kept current every render fixes that without
+  // recreating the responder.
+  const callbacksRef = useRef({ onTakePhoto, onStartRecording, onStopRecording, onZoomDrag });
+  useEffect(() => {
+    callbacksRef.current = { onTakePhoto, onStartRecording, onStopRecording, onZoomDrag };
+  });
+
   useEffect(() => {
     return () => {
       if (holdTimer.current) clearTimeout(holdTimer.current);
@@ -107,12 +119,12 @@ export function CaptureButton({
         holdTimer.current = setTimeout(() => {
           isRecording.current = true;
           startAnim();
-          onStartRecording();
+          callbacksRef.current.onStartRecording();
         }, HOLD_DELAY);
       },
 
       onPanResponderMove: (_event, gesture) => {
-        if (isRecording.current) onZoomDrag(gesture.dy);
+        if (isRecording.current) callbacksRef.current.onZoomDrag(gesture.dy);
       },
 
       onPanResponderRelease: () => {
@@ -121,12 +133,12 @@ export function CaptureButton({
         if (isRecording.current) {
           isRecording.current = false;
           stopAnim();
-          onStopRecording();
+          callbacksRef.current.onStopRecording();
           return;
         }
 
         punch();
-        onTakePhoto();
+        callbacksRef.current.onTakePhoto();
       },
 
       onPanResponderTerminate: () => {
@@ -135,7 +147,7 @@ export function CaptureButton({
         if (isRecording.current) {
           isRecording.current = false;
           stopAnim();
-          onStopRecording();
+          callbacksRef.current.onStopRecording();
           return;
         }
 
