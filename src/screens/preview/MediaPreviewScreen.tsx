@@ -721,14 +721,17 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
 
   function advanceAfterSave() {
     if (!selected) return;
+    // Compute the fallback from `ordered` (the visual-only list actually
+    // shown here) before removing, not `items.length` — items also holds
+    // audio memos, so a leftover voice memo elsewhere in the session made
+    // that count look non-empty while `ordered` was already down to zero,
+    // leaving nothing selected and nowhere navigated.
+    const fallback = ordered[index + 1] ?? ordered[index - 1];
     removeItem(selected.id);
-
-    if (items.length <= 1) {
-      navigation.navigate('Tabs', { screen: 'Timeline' });
+    if (fallback) {
+      setSelectedId(fallback.id);
     } else {
-      const index = ordered.findIndex((o) => o.id === selected.id);
-      const fallback = ordered[index + 1] ?? ordered[index - 1];
-      if (fallback) setSelectedId(fallback.id);
+      navigation.navigate('Tabs', { screen: 'Timeline' });
     }
   }
 
@@ -828,18 +831,10 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
         );
       }
 
-      if (editMemory) {
-        navigation.goBack();
-      } else {
-        removeItem(selected.id);
-        if (items.length <= 1) {
-          navigation.navigate('Tabs', { screen: 'Timeline' });
-        } else {
-          const idx = ordered.findIndex((o) => o.id === selected.id);
-          const fallback = ordered[idx + 1] ?? ordered[idx - 1];
-          if (fallback) setSelectedId(fallback.id);
-        }
-      }
+      // handleSaveEdit (the only caller) is only ever invoked for a genuine
+      // cross-session edit opened from the timeline, so editMemory is always
+      // set here.
+      navigation.goBack();
     } catch (e) {
       console.error(e);
       Alert.alert('Save Failed', 'Could not save your changes.');
