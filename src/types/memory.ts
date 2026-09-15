@@ -21,6 +21,8 @@ export interface Memory {
   transcript: string | null;
   aiStory: string | null;
   aiStatus: AiStatus;
+  /** Server-only. Set by the enrichment Cloud Function; the client never reads or writes it. */
+  embedding?: number[] | null;
   categorizationMethod: CategorizationMethod;
   includeInSlideshow: boolean;
   createdAt: number;

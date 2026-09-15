@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { CameraView } from 'expo-camera';
@@ -47,31 +47,55 @@ export function CaptureScreen() {
   const { destinationId, destinationLabel, setDestination } = useCaptureDestinationStore();
   const items = useCaptureSessionStore((state) => state.items);
   const addItem = useCaptureSessionStore((state) => state.addItem);
+  const claimForSaving = useCaptureSessionStore((state) => state.claimForSaving);
+  const unclaimSaving = useCaptureSessionStore((state) => state.unclaimSaving);
   const markSaved = useCaptureSessionStore((state) => state.markSaved);
   const { user } = useAuth();
   const { state: membership } = useFamilyCircleMembership(user);
+  const circleId = membership.status === 'ready' ? membership.circleId : null;
 
-  function autoSave(item: CaptureItem, durationSeconds?: number) {
-    if (!user || membership.status !== 'ready' || !membership.circleId) return;
+  function saveItem(item: CaptureItem) {
+    if (!user || !circleId) return;
+    // Claiming lives in the store (not a component ref) so this can't be
+    // defeated by the screen remounting between the immediate call below and
+    // a later retry from the flush effect.
+    if (!claimForSaving(item.id)) return;
+
     const type = item.kind === 'video' ? 'video' : item.kind === 'audio' ? 'voice' : 'photo';
     uploadBatchedMemories(
       user,
-      membership.circleId,
+      circleId,
       [{
         uri: item.uri,
         groupId: destinationId,
         takenAtMs: item.createdAt,
         type,
-        durationSeconds,
+        durationSeconds: item.durationSeconds,
       }],
       () => {},
     )
       .then((result) => {
         const id = result.ids[0];
         if (id) markSaved(item.id, id);
+        else unclaimSaving(item.id);
       })
-      .catch((e) => console.error('Auto-save failed', e));
+      .catch((e) => {
+        console.error('Auto-save failed', e);
+        unclaimSaving(item.id);
+      });
   }
+
+  // Capturing right as the screen opens can beat the family-circle membership
+  // lookup, which starts out 'loading'. Rather than dropping that capture on
+  // the floor, this re-runs whenever items or membership change, so anything
+  // still unsaved gets picked up the moment membership becomes ready.
+  useEffect(() => {
+    if (!user || !circleId) return;
+    for (const item of items) {
+      if (!item.savedMemoryId) saveItem(item);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, circleId, items]);
 
   const [facing, setFacing] = useState<Facing>('back');
   const [flash, setFlash] = useState<FlashMode>('auto');
@@ -156,25 +180,35 @@ export function CaptureScreen() {
       Animated.timing(shutterOpacity, { toValue: 0, duration: 240, useNativeDriver: true }),
     ]).start();
 
-    const photo = await cameraRef.current?.takePictureAsync({ quality: 1 });
-    if (photo) autoSave(addItem(photo.uri, 'photo'));
+    const photo = await cameraRef.current?.takePictureAsync({ quality: 0.85 });
+    if (photo) saveItem(addItem(photo.uri, 'photo'));
   }
 
-  async function handleTakePhoto() {
-    if (timerSeconds === 0) {
-      await capturePhoto();
-      return;
-    }
+  // The camera hardware can only run one capture at a time; without this,
+  // rapid taps queue up overlapping takePictureAsync calls (each holding a
+  // full-resolution image in memory) that lag the app and can eventually
+  // throw "Camera is not ready".
+  const isCapturingRef = useRef(false);
 
-    for (let remaining = timerSeconds; remaining > 0; remaining -= 1) {
-      setCountdown(remaining);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+  async function handleTakePhoto() {
+    if (isCapturingRef.current) return;
+    isCapturingRef.current = true;
+    try {
+      if (timerSeconds > 0) {
+        for (let remaining = timerSeconds; remaining > 0; remaining -= 1) {
+          setCountdown(remaining);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+        setCountdown(null);
+      }
+      await capturePhoto();
+    } finally {
+      isCapturingRef.current = false;
     }
-    setCountdown(null);
-    await capturePhoto();
   }
 
   async function handleStartRecording() {
+    if (isRecording) return; // already recording; ignore a re-trigger
     setCameraMode('video');
     setIsRecording(true);
     Animated.timing(chromeOpacity, {
@@ -186,9 +220,18 @@ export function CaptureScreen() {
     // The camera needs a beat to switch modes before it will accept a
     // recording, and it has to stay in video mode until the file comes back.
     await new Promise((resolve) => setTimeout(resolve, 150));
-    const video = await cameraRef.current?.recordAsync();
-    if (video) autoSave(addItem(video.uri, 'video'));
-    setCameraMode('picture');
+    try {
+      const video = await cameraRef.current?.recordAsync();
+      if (video) saveItem(addItem(video.uri, 'video'));
+    } catch (e) {
+      // A quick tap/hold racing the start-up sequence above can leave the
+      // native recorder in a bad state and reject here — without this catch,
+      // the screen below never runs and stays stuck showing video mode.
+      console.error('Recording failed', e);
+    } finally {
+      setCameraMode('picture');
+      setIsRecording(false);
+    }
   }
 
   function handleStopRecording() {
@@ -224,7 +267,7 @@ export function CaptureScreen() {
       {voiceMode ? (
         <VoiceRecorder
           onRecorded={(uri, durationMillis) =>
-            autoSave(addItem(uri, 'audio'), Math.round(durationMillis / 1000))
+            saveItem(addItem(uri, 'audio', Math.round(durationMillis / 1000)))
           }
         />
       ) : (
@@ -366,6 +409,11 @@ export function CaptureScreen() {
                   </View>
                 )}
                 {!lastMedia && <View style={styles.thumbnailPlaceholder} />}
+                {lastMedia && !lastMedia.savedMemoryId && (
+                  <View style={styles.thumbnailSavingOverlay}>
+                    <ActivityIndicator size="small" color={colors.surface} />
+                  </View>
+                )}
               </Pressable>
             </Animated.View>
           )}
@@ -547,5 +595,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
+  },
+  thumbnailSavingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

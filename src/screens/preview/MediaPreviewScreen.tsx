@@ -719,10 +719,55 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
     return captureRef(stageRef, { format: 'jpg', quality: 0.95 });
   }
 
+  function advanceAfterSave() {
+    if (!selected) return;
+    // Compute the fallback from `ordered` (the visual-only list actually
+    // shown here) before removing, not `items.length` — items also holds
+    // audio memos, so a leftover voice memo elsewhere in the session made
+    // that count look non-empty while `ordered` was already down to zero,
+    // leaving nothing selected and nowhere navigated.
+    const fallback = ordered[index + 1] ?? ordered[index - 1];
+    removeItem(selected.id);
+    if (fallback) {
+      setSelectedId(fallback.id);
+    } else {
+      navigation.navigate('Tabs', { screen: 'Timeline' });
+    }
+  }
+
+  // A fresh capture that already auto-saved has no "existing" copy to choose
+  // between — it's this session's own doc. Unedited, it's already correct;
+  // edited, override it in place rather than re-running the Override/Create
+  // New prompt (that's only meaningful for a genuine cross-session edit).
+  async function finalizeSessionSave(memoryId: string) {
+    if (!selected || !user) return;
+    if (!edited) {
+      advanceAfterSave();
+      return;
+    }
+    setBusy(true);
+    setSaving(true);
+    try {
+      const finalUri = await flatten();
+      await replaceMemoryMedia(user, memoryId, finalUri);
+      advanceAfterSave();
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Save Failed', 'Could not save your changes.');
+    } finally {
+      setBusy(false);
+      setSaving(false);
+    }
+  }
+
   async function handleSave() {
     if (busy || !selected) return;
-    if (activeEditTarget) {
+    if (editMemory) {
       handleSaveEdit();
+      return;
+    }
+    if (selected.savedMemoryId) {
+      await finalizeSessionSave(selected.savedMemoryId);
       return;
     }
     if (!user || membership.status !== 'ready' || !membership.circleId) return;
@@ -744,15 +789,7 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
         () => {}
       );
 
-      removeItem(selected.id);
-
-      if (items.length <= 1) {
-        navigation.navigate('Tabs', { screen: 'Timeline' });
-      } else {
-        const index = ordered.findIndex((o) => o.id === selected.id);
-        const fallback = ordered[index + 1] ?? ordered[index - 1];
-        if (fallback) setSelectedId(fallback.id);
-      }
+      advanceAfterSave();
     } catch (e) {
       console.error(e);
       Alert.alert('Upload Failed', 'Could not upload memory.');
@@ -764,6 +801,13 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
 
   function handleSaveEdit() {
     if (busy || !selected) return;
+
+    // Already exactly as saved — nothing to do, just close out.
+    if (!edited) {
+      navigation.goBack();
+      return;
+    }
+
     Alert.alert('Save changes', 'Override the existing photo, or save as a new one?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Create New', onPress: () => finalizeEdit('new') },
@@ -794,18 +838,10 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
         );
       }
 
-      if (editMemory) {
-        navigation.goBack();
-      } else {
-        removeItem(selected.id);
-        if (items.length <= 1) {
-          navigation.navigate('Tabs', { screen: 'Timeline' });
-        } else {
-          const idx = ordered.findIndex((o) => o.id === selected.id);
-          const fallback = ordered[idx + 1] ?? ordered[idx - 1];
-          if (fallback) setSelectedId(fallback.id);
-        }
-      }
+      // handleSaveEdit (the only caller) is only ever invoked for a genuine
+      // cross-session edit opened from the timeline, so editMemory is always
+      // set here.
+      navigation.goBack();
     } catch (e) {
       console.error(e);
       Alert.alert('Save Failed', 'Could not save your changes.');
