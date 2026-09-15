@@ -50,19 +50,28 @@ export function CaptureScreen() {
   const markSaved = useCaptureSessionStore((state) => state.markSaved);
   const { user } = useAuth();
   const { state: membership } = useFamilyCircleMembership(user);
+  const circleId = membership.status === 'ready' ? membership.circleId : null;
 
-  function autoSave(item: CaptureItem, durationSeconds?: number) {
-    if (!user || membership.status !== 'ready' || !membership.circleId) return;
+  // Items that have started an upload but haven't resolved yet, so the flush
+  // effect below doesn't fire a second upload for the same item while the
+  // first one is still in flight.
+  const savingIdsRef = useRef<Set<string>>(new Set());
+
+  function saveItem(item: CaptureItem) {
+    if (!user || !circleId) return;
+    if (item.savedMemoryId || savingIdsRef.current.has(item.id)) return;
+
+    savingIdsRef.current.add(item.id);
     const type = item.kind === 'video' ? 'video' : item.kind === 'audio' ? 'voice' : 'photo';
     uploadBatchedMemories(
       user,
-      membership.circleId,
+      circleId,
       [{
         uri: item.uri,
         groupId: destinationId,
         takenAtMs: item.createdAt,
         type,
-        durationSeconds,
+        durationSeconds: item.durationSeconds,
       }],
       () => {},
     )
@@ -70,8 +79,21 @@ export function CaptureScreen() {
         const id = result.ids[0];
         if (id) markSaved(item.id, id);
       })
-      .catch((e) => console.error('Auto-save failed', e));
+      .catch((e) => console.error('Auto-save failed', e))
+      .finally(() => savingIdsRef.current.delete(item.id));
   }
+
+  // Capturing right as the screen opens can beat the family-circle membership
+  // lookup, which starts out 'loading'. Rather than dropping that capture on
+  // the floor, this re-runs whenever items or membership change, so anything
+  // still unsaved gets picked up the moment membership becomes ready.
+  useEffect(() => {
+    if (!user || !circleId) return;
+    for (const item of items) {
+      if (!item.savedMemoryId) saveItem(item);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, circleId, items]);
 
   const [facing, setFacing] = useState<Facing>('back');
   const [flash, setFlash] = useState<FlashMode>('auto');
@@ -157,7 +179,7 @@ export function CaptureScreen() {
     ]).start();
 
     const photo = await cameraRef.current?.takePictureAsync({ quality: 1 });
-    if (photo) autoSave(addItem(photo.uri, 'photo'));
+    if (photo) saveItem(addItem(photo.uri, 'photo'));
   }
 
   async function handleTakePhoto() {
@@ -187,7 +209,7 @@ export function CaptureScreen() {
     // recording, and it has to stay in video mode until the file comes back.
     await new Promise((resolve) => setTimeout(resolve, 150));
     const video = await cameraRef.current?.recordAsync();
-    if (video) autoSave(addItem(video.uri, 'video'));
+    if (video) saveItem(addItem(video.uri, 'video'));
     setCameraMode('picture');
   }
 
@@ -224,7 +246,7 @@ export function CaptureScreen() {
       {voiceMode ? (
         <VoiceRecorder
           onRecorded={(uri, durationMillis) =>
-            autoSave(addItem(uri, 'audio'), Math.round(durationMillis / 1000))
+            saveItem(addItem(uri, 'audio', Math.round(durationMillis / 1000)))
           }
         />
       ) : (
