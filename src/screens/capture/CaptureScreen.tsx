@@ -99,6 +99,7 @@ export function CaptureScreen() {
 
   const [facing, setFacing] = useState<Facing>('back');
   const [flash, setFlash] = useState<FlashMode>('auto');
+  const [torchEnabled, setTorchEnabled] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
   const [albumPickerVisible, setAlbumPickerVisible] = useState(false);
@@ -148,15 +149,19 @@ export function CaptureScreen() {
     applyZoom(0);
   }
 
+  function loadAvailableLenses() {
+    cameraRef.current
+      ?.getAvailableLensesAsync()
+      .then(setAvailableLenses)
+      .catch(() => setAvailableLenses([]));
+  }
+
   useEffect(() => {
     if (facing !== 'back') {
       setSelectedLens(undefined);
       return;
     }
-    cameraRef.current
-      ?.getAvailableLensesAsync()
-      .then(setAvailableLenses)
-      .catch(() => setAvailableLenses([]));
+    loadAvailableLenses();
   }, [facing]);
 
   useEffect(() => {
@@ -167,6 +172,12 @@ export function CaptureScreen() {
   }, [cameraPermission]);
 
   function cycleFlash() {
+    // flash is a one-shot pulse for photos; the torch is the live-light
+    // equivalent while recording.
+    if (isRecording) {
+      setTorchEnabled((t) => !t);
+      return;
+    }
     setFlash((f) => FLASH_CYCLE[(FLASH_CYCLE.indexOf(f) + 1) % FLASH_CYCLE.length] ?? 'auto');
   }
 
@@ -279,12 +290,14 @@ export function CaptureScreen() {
               style={StyleSheet.absoluteFill}
               facing={facing}
               flash={flash}
+              enableTorch={isRecording && torchEnabled}
               mode={cameraMode}
               zoom={zoom}
               mirror={facing === 'front'}
               videoQuality="1080p"
               videoStabilizationMode="auto"
               selectedLens={selectedLens}
+              onCameraReady={loadAvailableLenses}
             />
           </View>
         </GestureDetector>
@@ -315,7 +328,11 @@ export function CaptureScreen() {
         <SafeAreaView style={styles.topBar} edges={['top']}>
           <View style={styles.topBarGroup}>
             <Pressable onPress={cycleFlash} style={styles.iconButton} hitSlop={10}>
-              <Ionicons name={FLASH_ICONS[flash]} size={28} color={colors.surface} />
+              <Ionicons
+                name={isRecording ? (torchEnabled ? 'flashlight' : 'flashlight-outline') : FLASH_ICONS[flash]}
+                size={28}
+                color={isRecording && torchEnabled ? colors.primary : colors.surface}
+              />
             </Pressable>
             <Pressable onPress={() => setGridEnabled((g) => !g)} style={styles.iconButton} hitSlop={10}>
               <Ionicons name="grid-outline" size={26} color={gridEnabled ? colors.primary : colors.surface} />
@@ -327,10 +344,15 @@ export function CaptureScreen() {
           </View>
           <Pressable
             onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}
+            disabled={isRecording}
             style={styles.iconButton}
             hitSlop={10}
           >
-            <Ionicons name="camera-reverse-outline" size={32} color={colors.surface} />
+            <Ionicons
+              name="camera-reverse-outline"
+              size={32}
+              color={isRecording ? 'rgba(255,255,255,0.35)' : colors.surface}
+            />
           </Pressable>
         </SafeAreaView>
       )}
