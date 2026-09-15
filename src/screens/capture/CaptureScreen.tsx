@@ -184,18 +184,27 @@ export function CaptureScreen() {
     if (photo) saveItem(addItem(photo.uri, 'photo'));
   }
 
-  async function handleTakePhoto() {
-    if (timerSeconds === 0) {
-      await capturePhoto();
-      return;
-    }
+  // The camera hardware can only run one capture at a time; without this,
+  // rapid taps queue up overlapping takePictureAsync calls (each holding a
+  // full-resolution image in memory) that lag the app and can eventually
+  // throw "Camera is not ready".
+  const isCapturingRef = useRef(false);
 
-    for (let remaining = timerSeconds; remaining > 0; remaining -= 1) {
-      setCountdown(remaining);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+  async function handleTakePhoto() {
+    if (isCapturingRef.current) return;
+    isCapturingRef.current = true;
+    try {
+      if (timerSeconds > 0) {
+        for (let remaining = timerSeconds; remaining > 0; remaining -= 1) {
+          setCountdown(remaining);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+        setCountdown(null);
+      }
+      await capturePhoto();
+    } finally {
+      isCapturingRef.current = false;
     }
-    setCountdown(null);
-    await capturePhoto();
   }
 
   async function handleStartRecording() {
