@@ -719,10 +719,52 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
     return captureRef(stageRef, { format: 'jpg', quality: 0.95 });
   }
 
+  function advanceAfterSave() {
+    if (!selected) return;
+    removeItem(selected.id);
+
+    if (items.length <= 1) {
+      navigation.navigate('Tabs', { screen: 'Timeline' });
+    } else {
+      const index = ordered.findIndex((o) => o.id === selected.id);
+      const fallback = ordered[index + 1] ?? ordered[index - 1];
+      if (fallback) setSelectedId(fallback.id);
+    }
+  }
+
+  // A fresh capture that already auto-saved has no "existing" copy to choose
+  // between — it's this session's own doc. Unedited, it's already correct;
+  // edited, override it in place rather than re-running the Override/Create
+  // New prompt (that's only meaningful for a genuine cross-session edit).
+  async function finalizeSessionSave(memoryId: string) {
+    if (!selected || !user) return;
+    if (!edited) {
+      advanceAfterSave();
+      return;
+    }
+    setBusy(true);
+    setSaving(true);
+    try {
+      const finalUri = await flatten();
+      await replaceMemoryMedia(user, memoryId, finalUri);
+      advanceAfterSave();
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Save Failed', 'Could not save your changes.');
+    } finally {
+      setBusy(false);
+      setSaving(false);
+    }
+  }
+
   async function handleSave() {
     if (busy || !selected) return;
-    if (activeEditTarget) {
+    if (editMemory) {
       handleSaveEdit();
+      return;
+    }
+    if (selected.savedMemoryId) {
+      await finalizeSessionSave(selected.savedMemoryId);
       return;
     }
     if (!user || membership.status !== 'ready' || !membership.circleId) return;
@@ -744,15 +786,7 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
         () => {}
       );
 
-      removeItem(selected.id);
-
-      if (items.length <= 1) {
-        navigation.navigate('Tabs', { screen: 'Timeline' });
-      } else {
-        const index = ordered.findIndex((o) => o.id === selected.id);
-        const fallback = ordered[index + 1] ?? ordered[index - 1];
-        if (fallback) setSelectedId(fallback.id);
-      }
+      advanceAfterSave();
     } catch (e) {
       console.error(e);
       Alert.alert('Upload Failed', 'Could not upload memory.');
