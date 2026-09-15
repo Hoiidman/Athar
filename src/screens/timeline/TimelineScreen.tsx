@@ -265,13 +265,13 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
               contentFit="cover" transition={200} cachePolicy="memory-disk"
             />
             {item.type === 'video' && (
-              <View style={styles.iconOverlay}>
-                <Ionicons name="play-circle" size={24} color="#fff" />
+              <View style={styles.typeIconOverlay} pointerEvents="none">
+                <Ionicons name="play-circle" size={40} color="#fff" />
               </View>
             )}
             {item.type === 'voice' && (
-              <View style={styles.iconOverlay}>
-                <Ionicons name="mic" size={24} color="#fff" />
+              <View style={styles.typeIconOverlay} pointerEvents="none">
+                <Ionicons name="mic-circle" size={40} color="#fff" />
               </View>
             )}
             {item.type === 'voice' && item.durationSeconds != null && (
@@ -481,6 +481,15 @@ const styles = StyleSheet.create({
     right: 4,
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 12,
+  },
+  typeIconOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   durationBadge: {
     position: 'absolute',
