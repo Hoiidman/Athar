@@ -28,7 +28,7 @@ type SearchState =
   | { status: 'error'; message: string }
   | { status: 'ready'; results: SearchResultMemory[] };
 
-const THUMBNAIL_SIZE = 72;
+const THUMBNAIL_SIZE = 104;
 
 // ImageViewerModal only ever reads id/storageUrl/type/memoryGroupId off each
 // item (plus `groups` to resolve a display label) — every other Memory field
@@ -162,10 +162,13 @@ export function SearchScreen() {
                     <Ionicons name="mic" size={20} color="#fff" />
                   </View>
                 )}
+                <View style={styles.confidenceBadge}>
+                  <Text style={styles.confidenceText}>{item.confidence}%</Text>
+                </View>
               </View>
               <Text
                 style={[styles.caption, !item.aiStory && styles.captionMuted]}
-                numberOfLines={3}
+                numberOfLines={4}
               >
                 {item.aiStory ?? 'No description yet'}
               </Text>
@@ -194,7 +197,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
   },
   title: {
@@ -247,6 +250,21 @@ const styles = StyleSheet.create({
     right: 4,
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 12,
+  },
+  confidenceBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  confidenceText: {
+    ...typography.caption,
+    fontSize: 11,
+    color: '#fff',
+    fontVariant: ['tabular-nums'],
   },
   caption: {
     ...typography.body,
