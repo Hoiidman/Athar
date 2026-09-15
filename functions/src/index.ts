@@ -5,4 +5,5 @@ initializeApp();
 export { enrichMemory } from './enrichMemory';
 export { backfillEmbeddings } from './backfillEmbeddings';
 export { migrateEmbeddingField } from './migrateEmbeddingField';
+export { retryStuckEnrichment } from './retryStuckEnrichment';
 export { searchMemories } from './searchMemories';

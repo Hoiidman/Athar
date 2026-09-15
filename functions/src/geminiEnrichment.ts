@@ -1,4 +1,5 @@
 import { ApiError, GoogleGenAI } from '@google/genai';
+import { FieldValue, type DocumentReference } from 'firebase-admin/firestore';
 
 // Firestore's vector index supports at most 2048 dimensions; gemini-embedding-001
 // defaults to 3072, so the reduced size must be requested explicitly. This value
@@ -105,4 +106,37 @@ export async function embedText(
   const values = result.embeddings?.[0]?.values;
   if (!values) throw new Error('Empty embedding from Gemini');
   return values;
+}
+
+// Shared by enrichMemory, backfillEmbeddings, and retryStuckEnrichment.
+export async function enrichPhotoMemory(
+  ai: GoogleGenAI,
+  ref: DocumentReference,
+  storageUrl: string,
+): Promise<boolean> {
+  try {
+    const imgResponse = await fetch(storageUrl);
+    if (!imgResponse.ok) {
+      throw new Error(`Failed to fetch image: ${imgResponse.status}`);
+    }
+    const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());
+    const mimeType = imgResponse.headers.get('content-type') ?? 'image/jpeg';
+
+    const description = await generateDescription(ai, imgBuffer, mimeType);
+    const embedding = await embedText(ai, description, 'RETRIEVAL_DOCUMENT');
+
+    await ref.update({
+      aiStory: description,
+      embedding: FieldValue.vector(embedding),
+      aiStatus: 'success',
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return true;
+  } catch (err) {
+    console.error(`Enrichment failed for ${ref.path}`, err);
+    await ref
+      .update({ aiStatus: 'failed', updatedAt: FieldValue.serverTimestamp() })
+      .catch((updateErr) => console.error('Failed to write failure status', updateErr));
+    return false;
+  }
 }

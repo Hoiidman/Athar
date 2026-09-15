@@ -1,7 +1,7 @@
 import { onRequest } from 'firebase-functions/v2/https';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
 import { GoogleGenAI } from '@google/genai';
-import { generateDescription, embedText } from './geminiEnrichment';
+import { enrichPhotoMemory } from './geminiEnrichment';
 import { GEMINI_API_KEY } from './enrichMemory';
 
 // One-off admin utility, not linked from the app. Processes existing photos
@@ -42,31 +42,9 @@ export const backfillEmbeddings = onRequest(
         continue;
       }
 
-      try {
-        const imgResponse = await fetch(memory.storageUrl as string);
-        if (!imgResponse.ok) {
-          throw new Error(`Failed to fetch image: ${imgResponse.status}`);
-        }
-        const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());
-        const mimeType = imgResponse.headers.get('content-type') ?? 'image/jpeg';
-
-        const description = await generateDescription(ai, imgBuffer, mimeType);
-        const embedding = await embedText(ai, description, 'RETRIEVAL_DOCUMENT');
-
-        await docSnap.ref.update({
-          aiStory: description,
-          embedding: FieldValue.vector(embedding),
-          aiStatus: 'success',
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-        processed++;
-      } catch (err) {
-        failed++;
-        console.error(`Backfill failed for ${docSnap.id}`, err);
-        await docSnap.ref
-          .update({ aiStatus: 'failed', updatedAt: FieldValue.serverTimestamp() })
-          .catch((updateErr) => console.error('Failed to write failure status', updateErr));
-      }
+      const ok = await enrichPhotoMemory(ai, docSnap.ref, memory.storageUrl as string);
+      if (ok) processed++;
+      else failed++;
     }
 
     res.json({ processed, failed, skipped, total: snapshot.size });
