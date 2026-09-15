@@ -208,6 +208,7 @@ export function CaptureScreen() {
   }
 
   async function handleStartRecording() {
+    if (isRecording) return; // already recording; ignore a re-trigger
     setCameraMode('video');
     setIsRecording(true);
     Animated.timing(chromeOpacity, {
@@ -219,9 +220,18 @@ export function CaptureScreen() {
     // The camera needs a beat to switch modes before it will accept a
     // recording, and it has to stay in video mode until the file comes back.
     await new Promise((resolve) => setTimeout(resolve, 150));
-    const video = await cameraRef.current?.recordAsync();
-    if (video) saveItem(addItem(video.uri, 'video'));
-    setCameraMode('picture');
+    try {
+      const video = await cameraRef.current?.recordAsync();
+      if (video) saveItem(addItem(video.uri, 'video'));
+    } catch (e) {
+      // A quick tap/hold racing the start-up sequence above can leave the
+      // native recorder in a bad state and reject here — without this catch,
+      // the screen below never runs and stays stuck showing video mode.
+      console.error('Recording failed', e);
+    } finally {
+      setCameraMode('picture');
+      setIsRecording(false);
+    }
   }
 
   function handleStopRecording() {
