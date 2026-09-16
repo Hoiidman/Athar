@@ -34,6 +34,7 @@ interface FamilyCircleHubScreenProps {
   onOpenInvite: () => void;
   onOpenSettings: () => void;
   onOpenAccessibility: () => void;
+  onOpenPrivacy: () => void;
   onCircleLost: () => void;
   onSetUpCircle: () => void;
   onUpgradeAccount: () => void;
@@ -174,6 +175,7 @@ export function FamilyCircleHubScreen({
   onOpenInvite,
   onOpenSettings,
   onOpenAccessibility,
+  onOpenPrivacy,
   onCircleLost,
   onSetUpCircle,
   onUpgradeAccount,
@@ -245,6 +247,12 @@ export function FamilyCircleHubScreen({
             title="Accessibility"
             subtitle="Text size, contrast, and simplified navigation"
             onPress={onOpenAccessibility}
+          />
+          <ActionRow
+            icon="lock-closed"
+            title="Privacy"
+            subtitle="Whether AI can read your photos for smart search and auto-sort"
+            onPress={onOpenPrivacy}
           />
           <SignOutButton />
         </Section>
