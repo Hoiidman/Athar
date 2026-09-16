@@ -1,5 +1,5 @@
 import type { User } from 'firebase/auth';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -15,12 +15,13 @@ import { AvatarStack } from '../../components/AvatarStack';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
 import { SignOutButton } from '../../components/SignOutButton';
+import { useAppTheme, type AppTheme } from '../../hooks/useAppTheme';
 import {
   useFamilyCircleOverview,
   type FamilyCircleOverviewState,
 } from '../../hooks/useFamilyCircleOverview';
 import type { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
-import { cardCornerRadius, cardShadow, colors, spacing, typography } from '../../theme';
+import { cardCornerRadius, cardShadow, spacing } from '../../theme';
 
 type MembershipState = ReturnType<typeof useFamilyCircleMembership>['state'];
 
@@ -32,6 +33,7 @@ interface FamilyCircleHubScreenProps {
   onOpenMembers: () => void;
   onOpenInvite: () => void;
   onOpenSettings: () => void;
+  onOpenAccessibility: () => void;
   onCircleLost: () => void;
   onSetUpCircle: () => void;
   onUpgradeAccount: () => void;
@@ -42,6 +44,8 @@ function memberCountLabel(count: number) {
 }
 
 function Section({ label, children }: { label: string; children: ReactNode }) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   return (
     <View style={styles.section}>
       <Text style={styles.sectionLabel}>{label}</Text>
@@ -51,9 +55,11 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function LoadingCard() {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   return (
     <View style={styles.loadingCard}>
-      <ActivityIndicator color={colors.primary} />
+      <ActivityIndicator color={theme.colors.primary} />
     </View>
   );
 }
@@ -76,6 +82,8 @@ function CircleSection({
   onOpenInvite,
   onSetUpCircle,
 }: CircleSectionProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const circleId = state.status === 'ready' ? state.circleId : null;
 
   if (state.status === 'loading') return <LoadingCard />;
@@ -165,10 +173,13 @@ export function FamilyCircleHubScreen({
   onOpenMembers,
   onOpenInvite,
   onOpenSettings,
+  onOpenAccessibility,
   onCircleLost,
   onSetUpCircle,
   onUpgradeAccount,
 }: FamilyCircleHubScreenProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const circleId = state.status === 'ready' ? state.circleId : null;
   const { state: overview, reload, refresh, refreshing } = useFamilyCircleOverview(circleId);
 
@@ -190,8 +201,8 @@ export function FamilyCircleHubScreen({
           <RefreshControl
             refreshing={refreshing}
             onRefresh={pullToRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
+            tintColor={theme.colors.primary}
+            colors={[theme.colors.primary]}
           />
         }
       >
@@ -229,6 +240,12 @@ export function FamilyCircleHubScreen({
               onPress={onOpenSettings}
             />
           ) : null}
+          <ActionRow
+            icon="accessibility"
+            title="Accessibility"
+            subtitle="Text size, contrast, and simplified navigation"
+            onPress={onOpenAccessibility}
+          />
           <SignOutButton />
         </Section>
       </ScrollView>
@@ -236,57 +253,59 @@ export function FamilyCircleHubScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    padding: spacing.sm,
-    gap: spacing.md,
-  },
-  header: {
-    gap: spacing.xs,
-    paddingTop: spacing.xs,
-  },
-  title: {
-    ...typography.display,
-    color: colors.textPrimary,
-  },
-  tagline: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  section: {
-    gap: spacing.xs,
-  },
-  sectionLabel: {
-    ...typography.eyebrow,
-    color: colors.textSecondary,
-  },
-  identity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  identityText: {
-    flex: 1,
-    gap: 2,
-  },
-  circleName: {
-    ...typography.heading,
-    color: colors.textPrimary,
-  },
-  circleMeta: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  loadingCard: {
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: cardCornerRadius,
-    paddingVertical: spacing.lg,
-    ...cardShadow,
-  },
-});
+function createStyles({ colors, typography }: AppTheme) {
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    content: {
+      padding: spacing.sm,
+      gap: spacing.md,
+    },
+    header: {
+      gap: spacing.xs,
+      paddingTop: spacing.xs,
+    },
+    title: {
+      ...typography.display,
+      color: colors.textPrimary,
+    },
+    tagline: {
+      ...typography.body,
+      color: colors.textSecondary,
+    },
+    section: {
+      gap: spacing.xs,
+    },
+    sectionLabel: {
+      ...typography.eyebrow,
+      color: colors.textSecondary,
+    },
+    identity: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingVertical: spacing.xs,
+    },
+    identityText: {
+      flex: 1,
+      gap: 2,
+    },
+    circleName: {
+      ...typography.heading,
+      color: colors.textPrimary,
+    },
+    circleMeta: {
+      ...typography.caption,
+      color: colors.textSecondary,
+    },
+    loadingCard: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: cardCornerRadius,
+      paddingVertical: spacing.lg,
+      ...cardShadow,
+    },
+  });
+}
