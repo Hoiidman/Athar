@@ -33,6 +33,7 @@ import { categorizeMemories } from '../../services/ai';
 import { firestore } from '../../services/firebase';
 import type { Memory } from '../../types/memory';
 import { colors, spacing, typography } from '../../theme';
+import { useAccessibilityStore } from '../../store/accessibilityStore';
 import { BulkUploadScreen, type CategorizedPhoto } from '../upload/BulkUploadScreen';
 import { UploadProgressScreen } from '../upload/UploadProgressScreen';
 import { ImageViewerModal } from '../../components/ImageViewerModal';
@@ -42,9 +43,7 @@ interface TimelineScreenProps {
   user: User;
 }
 
-const numColumns = 3;
 const screenWidth = Dimensions.get('window').width;
-const imageSize = screenWidth / numColumns;
 
 const AUTO_SORT_POLL_MS = 2000;
 const AUTO_SORT_MAX_WAIT_MS = 20000;
@@ -84,6 +83,12 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
   const { state: overviewState } = useFamilyCircleOverview(circleId);
   const groupsState = useMemoryGroups(circleId);
   const memoriesState = useMySpaceMemories(user.uid, circleId);
+
+  // Larger text needs more room per row, so the grid drops from 3 columns
+  // to 2 once the text size setting is above Standard.
+  const textSize = useAccessibilityStore((state) => state.textSize);
+  const numColumns = textSize === 'standard' ? 3 : 2;
+  const imageSize = screenWidth / numColumns;
 
   const [moveModalVisible, setMoveModalVisible] = useState(false);
   const [viewingMemory, setViewingMemory] = useState<Memory | null>(null);
@@ -305,6 +310,9 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
       </View>
 
       <FlatList
+        // FlatList doesn't support changing numColumns on the fly; the key
+        // forces a fresh mount when the text size setting flips the column count.
+        key={numColumns}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         data={memories}
         numColumns={numColumns}
@@ -324,7 +332,11 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
           const group = groups.find(g => g.id === item.memoryGroupId);
           return (
           <Pressable
-            style={[styles.imageContainer, isSelected && { opacity: 0.7, borderWidth: 2, borderColor: colors.primary }]}
+            style={[
+              styles.imageContainer,
+              { width: imageSize, height: imageSize },
+              isSelected && { opacity: 0.7, borderWidth: 2, borderColor: colors.primary },
+            ]}
             onLongPress={() => { setSelectionMode(true); toggleSelection(item.id); }}
             onPress={() => {
               if (selectionMode) {
@@ -571,8 +583,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   imageContainer: {
-    width: imageSize,
-    height: imageSize,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.background,
   },

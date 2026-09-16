@@ -61,3 +61,31 @@ export const darkColors: Record<keyof typeof colors, string> = {
   success: '#7FBF92',
   warning: '#D9A64E',
 };
+
+// The high-contrast accessibility setting: pure black on white, opaque
+// borders, and every tint darkened until it clears 4.5:1 on white (3:1 for
+// icons), since translucent tints and warm neutrals are what low-vision
+// readers lose first.
+export const highContrastColors: Record<keyof typeof colors, string> = {
+  background: '#FFFFFF',
+  surface: '#FFFFFF',
+  sunken: '#E5E5E5',
+  tabBar: '#FFFFFF',
+
+  textPrimary: '#000000',
+  textSecondary: '#000000',
+  textOnAccent: '#FFFFFF',
+
+  uiIcon: '#000000',
+  border: '#000000',
+
+  primary: '#7A2415',
+  primaryPressed: '#5E1B10',
+
+  sage: '#33421F',
+  sageIcon: '#293418',
+
+  error: '#8C1E14',
+  success: '#155724',
+  warning: '#5C3D00',
+};

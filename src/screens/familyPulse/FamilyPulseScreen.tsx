@@ -1,7 +1,9 @@
+import type { NavigationProp } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { User } from 'firebase/auth';
 import { useState } from 'react';
 import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
+import type { RootStackParamList } from '../../navigation/RootStackNavigator';
 import { clearOwnFamilyCircleId } from '../../services/users';
 import { UpgradeAccountScreen } from '../auth/UpgradeAccountScreen';
 import { FamilyCircleMembersScreen } from '../familyCircle/FamilyCircleMembersScreen';
@@ -10,6 +12,9 @@ import { FamilyCircleSettingsScreen } from '../familyCircle/FamilyCircleSettings
 import { InviteScreen } from '../familyCircle/InviteScreen';
 import { MemberDetailScreen } from '../familyCircle/MemberDetailScreen';
 import { FamilyCircleHubScreen } from './FamilyCircleHubScreen';
+
+// Must match the `id` given to the Stack.Navigator in RootStackNavigator.
+const ROOT_STACK_ID = 'RootStack';
 
 export type FamilyPulseStackParamList = {
   FamilyPulseHome: undefined;
@@ -45,6 +50,11 @@ export function FamilyPulseScreen({ user }: { user: User }) {
             onOpenMembers={() => navigation.navigate('FamilyCircleMembers')}
             onOpenInvite={() => navigation.navigate('FamilyCircleInvite')}
             onOpenSettings={() => navigation.navigate('FamilyCircleSettings')}
+            onOpenAccessibility={() =>
+              navigation
+                .getParent<NavigationProp<RootStackParamList>>(ROOT_STACK_ID)
+                ?.navigate('AccessibilitySettings')
+            }
             onCircleLost={() => {
               void clearOwnFamilyCircleId(user.uid).catch(() => undefined);
               adoptCircle(null);

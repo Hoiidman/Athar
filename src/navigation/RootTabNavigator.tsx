@@ -2,11 +2,12 @@ import { useCallback } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../hooks/useAuth';
+import { useAppTheme } from '../hooks/useAppTheme';
+import { useAccessibilityStore } from '../store/accessibilityStore';
 import { CaptureScreen } from '../screens/capture/CaptureScreen';
 import { TimelineScreen } from '../screens/timeline/TimelineScreen';
 import { MemoryGroupsNavigator } from './MemoryGroupsNavigator';
 import { FamilyPulseScreen } from '../screens/familyPulse/FamilyPulseScreen';
-import { colors } from '../theme';
 
 export type RootTabParamList = {
   Capture: undefined;
@@ -19,6 +20,10 @@ const Tab = createBottomTabNavigator<RootTabParamList>();
 
 export function RootTabNavigator() {
   const { user } = useAuth();
+  const { colors } = useAppTheme();
+  // Simplified navigation drops Albums from the tab bar entirely. Turning
+  // the setting back off in Accessibility (reachable from Family) restores it.
+  const simplifiedMode = useAccessibilityStore((state) => state.simplifiedMode);
   // Tab.Screen's `children` identity is the screen's component type — an
   // inline arrow function here would be a new type on every render, forcing
   // React Navigation to unmount and remount the tab (losing scroll position,
@@ -53,9 +58,11 @@ export function RootTabNavigator() {
     >
       <Tab.Screen name="Capture" component={CaptureScreen} />
       <Tab.Screen name="Timeline">{renderTimeline}</Tab.Screen>
-      <Tab.Screen name="MemoryGroups" options={{ tabBarLabel: 'Albums' }}>
-        {renderMemoryGroups}
-      </Tab.Screen>
+      {simplifiedMode ? null : (
+        <Tab.Screen name="MemoryGroups" options={{ tabBarLabel: 'Albums' }}>
+          {renderMemoryGroups}
+        </Tab.Screen>
+      )}
       <Tab.Screen name="FamilyPulse" options={{ tabBarLabel: 'Family' }}>
         {renderFamilyPulse}
       </Tab.Screen>

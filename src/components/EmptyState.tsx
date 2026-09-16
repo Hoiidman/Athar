@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { cardCornerRadius, cardShadow, colors, spacing, typography } from '../theme';
+import { cardCornerRadius, cardShadow, spacing } from '../theme';
+import { useAppTheme, type AppTheme } from '../hooks/useAppTheme';
 
 type EmptyStateProps = {
   title: string;
@@ -21,9 +23,12 @@ export function EmptyState({
   tone = 'neutral',
   children,
 }: EmptyStateProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   // The accent belongs to the button below; a glyph in the same clay would
   // compete with it from 200px away.
-  const accent = tone === 'error' ? colors.error : colors.sageIcon;
+  const accent = tone === 'error' ? theme.colors.error : theme.colors.sageIcon;
 
   return (
     <View style={styles.card}>
@@ -37,30 +42,32 @@ export function EmptyState({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    alignSelf: 'stretch',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.surface,
-    borderRadius: cardCornerRadius,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.md,
-    ...cardShadow,
-  },
-  actions: {
-    alignSelf: 'stretch',
-    gap: spacing.xs,
-    marginTop: spacing.xs,
-  },
-  title: {
-    ...typography.heading,
-    color: colors.textPrimary,
-    textAlign: 'center',
-  },
-  message: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-});
+function createStyles({ colors, typography }: AppTheme) {
+  return StyleSheet.create({
+    card: {
+      alignSelf: 'stretch',
+      alignItems: 'center',
+      gap: spacing.xs,
+      backgroundColor: colors.surface,
+      borderRadius: cardCornerRadius,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.md,
+      ...cardShadow,
+    },
+    actions: {
+      alignSelf: 'stretch',
+      gap: spacing.xs,
+      marginTop: spacing.xs,
+    },
+    title: {
+      ...typography.heading,
+      color: colors.textPrimary,
+      textAlign: 'center',
+    },
+    message: {
+      ...typography.body,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+  });
+}
