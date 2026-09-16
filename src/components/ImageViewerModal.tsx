@@ -148,6 +148,7 @@ export function ImageViewerModal({
         uri: memory.storageUrl,
         kind: memory.type === 'video' ? 'video' : 'photo',
         groupId: memory.memoryGroupId,
+        uploadedBy: memory.uploadedBy,
       },
     });
   }
