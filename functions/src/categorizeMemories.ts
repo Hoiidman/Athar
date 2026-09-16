@@ -11,18 +11,25 @@ interface CategorizeRequest {
   memoryIds: string[];
 }
 
+interface GeoPoint {
+  lat: number;
+  lng: number;
+}
+
 interface ExistingGroup {
   id: string;
   title: string;
   category?: string;
   startDate: number;
   endDate: number;
+  location?: GeoPoint | null;
 }
 
 interface Candidate {
   id: string;
   aiStory: string;
   takenAt: number | null;
+  location: GeoPoint | null;
 }
 
 function startOfDay(ms: number): number {
@@ -99,6 +106,10 @@ async function classifyLeftovers(
     'this occasion or timeframe. Only propose a new album when a cluster of photos ' +
     "clearly shares an occasion/theme that no existing album covers. Never create a " +
     "new album for a single unrelated photo unless it's a genuinely distinct event.\n\n" +
+    'Photos and albums may include GPS coordinates (decimal degrees, lat/lng). ' +
+    "Two photos within roughly a few kilometers of each other, taken close in " +
+    "time, are likely the same outing — use that as a clustering signal " +
+    'alongside the date and description, not a replacement for them.\n\n' +
     `EXISTING ALBUMS:\n${JSON.stringify(
       groups.map((g) => ({
         id: g.id,
@@ -108,6 +119,7 @@ async function classifyLeftovers(
           new Date(g.startDate).toISOString().slice(0, 10),
           new Date(g.endDate).toISOString().slice(0, 10),
         ],
+        location: g.location ?? null,
       })),
       null,
       2,
@@ -117,6 +129,7 @@ async function classifyLeftovers(
         id: c.id,
         description: c.aiStory,
         takenOn: c.takenAt ? new Date(c.takenAt).toISOString().slice(0, 10) : 'unknown',
+        location: c.location,
       })),
       null,
       2,
@@ -176,6 +189,7 @@ export const categorizeMemories = onCall<CategorizeRequest>(
         category: data.category,
         startDate: (data.startDate as Timestamp).toMillis(),
         endDate: (data.endDate as Timestamp).toMillis(),
+        location: (data.location as GeoPoint | null | undefined) ?? null,
       };
     });
 
@@ -207,7 +221,8 @@ export const categorizeMemories = onCall<CategorizeRequest>(
       if (dateMatches.length === 1 && dateMatches[0]) {
         deterministic.set(snap.id, dateMatches[0]);
       } else {
-        leftovers.push({ id: snap.id, aiStory: data.aiStory as string, takenAt: takenAtMs });
+        const location = (data.location as GeoPoint | null | undefined) ?? null;
+        leftovers.push({ id: snap.id, aiStory: data.aiStory as string, takenAt: takenAtMs, location });
       }
     }
 
@@ -237,11 +252,24 @@ export const categorizeMemories = onCall<CategorizeRequest>(
         const memberPhotos = assignments.filter(
           (a) => a.action === 'new' && a.newGroupKey === key && leftoverIds.has(a.memoryId),
         );
-        const dates = memberPhotos
-          .map((a) => leftovers.find((c) => c.id === a.memoryId)?.takenAt)
+        const memberCandidates = memberPhotos
+          .map((a) => leftovers.find((c) => c.id === a.memoryId))
+          .filter((c): c is Candidate => c != null);
+        const dates = memberCandidates
+          .map((c) => c.takenAt)
           .filter((ms): ms is number => ms != null);
         const startMs = dates.length ? Math.min(...dates) : Date.now();
         const endMs = dates.length ? Math.max(...dates) : Date.now();
+
+        const locations = memberCandidates
+          .map((c) => c.location)
+          .filter((loc): loc is GeoPoint => loc != null);
+        const centroid = locations.length
+          ? {
+              lat: locations.reduce((sum, l) => sum + l.lat, 0) / locations.length,
+              lng: locations.reduce((sum, l) => sum + l.lng, 0) / locations.length,
+            }
+          : null;
 
         const category = decl.category && VALID_CATEGORIES.includes(decl.category)
           ? decl.category
@@ -253,6 +281,7 @@ export const categorizeMemories = onCall<CategorizeRequest>(
           title,
           startDate: Timestamp.fromMillis(startMs),
           endDate: Timestamp.fromMillis(endMs),
+          location: centroid,
           memberIds: [uid],
           coverPhotoUrl: null,
           createdBy: uid,
