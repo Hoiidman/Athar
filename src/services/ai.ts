@@ -21,3 +21,22 @@ export async function searchMemories(query: string, familyCircleId: string): Pro
   const response = await searchMemoriesCallable({ query, familyCircleId });
   return response.data.results;
 }
+
+export interface CategorizeResult {
+  assigned: number;
+  newGroupsCreated: number;
+  skipped: number;
+}
+
+const categorizeMemoriesCallable = httpsCallable<
+  { familyCircleId: string; memoryIds: string[] },
+  CategorizeResult
+>(functions, 'categorizeMemories');
+
+export async function categorizeMemories(
+  familyCircleId: string,
+  memoryIds: string[],
+): Promise<CategorizeResult> {
+  const response = await categorizeMemoriesCallable({ familyCircleId, memoryIds });
+  return response.data;
+}

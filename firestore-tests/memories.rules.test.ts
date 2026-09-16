@@ -75,6 +75,7 @@ beforeEach(async () => {
       aiStory: null,
       aiStatus: 'not_applicable',
       embedding: null,
+      location: null,
       categorizationMethod: 'default',
       includeInSlideshow: true,
       createdAt: serverTimestamp(),
@@ -96,6 +97,7 @@ beforeEach(async () => {
       aiStory: null,
       aiStatus: 'not_applicable',
       embedding: null,
+      location: null,
       categorizationMethod: 'default',
       includeInSlideshow: true,
       createdAt: serverTimestamp(),
@@ -147,6 +149,7 @@ describe('memories rules', () => {
       aiStory: null,
       aiStatus: 'not_applicable',
       embedding: null,
+      location: null,
       categorizationMethod: 'default',
       includeInSlideshow: true,
       createdAt: serverTimestamp(),
@@ -174,6 +177,18 @@ describe('memories rules', () => {
       const db = dbFor(MEMBER_1);
       const badMemory = { ...validMemory, embedding: [0.1, 0.2, 0.3] };
       await assertFails(setDoc(doc(db, 'memories', 'hacked-embedding'), badMemory));
+    });
+
+    it('allows creating a memory with a valid location', async () => {
+      const db = dbFor(MEMBER_1);
+      const geotagged = { ...validMemory, location: { lat: 40.7, lng: -74.0 } };
+      await assertSucceeds(setDoc(doc(db, 'memories', 'geotagged-mem'), geotagged));
+    });
+
+    it('denies a malformed location shape', async () => {
+      const db = dbFor(MEMBER_1);
+      const badMemory = { ...validMemory, location: { lat: '40.7', lng: -74.0 } };
+      await assertFails(setDoc(doc(db, 'memories', 'bad-location-mem'), badMemory));
     });
 
     it('denies a member from writing their own embedding on update', async () => {

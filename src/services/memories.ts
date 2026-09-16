@@ -73,6 +73,7 @@ export interface UploadablePhoto {
   takenAtMs: number | null;
   type: "photo" | "video" | "voice";
   durationSeconds?: number;
+  location?: { lat: number; lng: number } | null;
 }
 
 export interface BatchUploadResult {
@@ -134,6 +135,7 @@ async function uploadSingleMemory(user: User, circleId: string, photo: Uploadabl
     aiStory: null,
     aiStatus: photo.type === 'photo' ? 'pending' : 'not_applicable',
     embedding: null,
+    location: photo.location ?? null,
     categorizationMethod: 'auto',
     includeInSlideshow: true,
     createdAt: serverTimestamp(),
