@@ -11,6 +11,7 @@ import { FamilyCircleOnboardingScreen } from '../familyCircle/FamilyCircleOnboar
 import { FamilyCircleSettingsScreen } from '../familyCircle/FamilyCircleSettingsScreen';
 import { InviteScreen } from '../familyCircle/InviteScreen';
 import { MemberDetailScreen } from '../familyCircle/MemberDetailScreen';
+import { PrivacySettingsScreen } from '../settings/PrivacySettingsScreen';
 import { FamilyCircleHubScreen } from './FamilyCircleHubScreen';
 
 // Must match the `id` given to the Stack.Navigator in RootStackNavigator.
@@ -23,6 +24,7 @@ export type FamilyPulseStackParamList = {
   FamilyCircleInvite: undefined;
   FamilyCircleSettings: undefined;
   FamilyCircleSetup: undefined;
+  PrivacySettings: undefined;
   UpgradeAccount: undefined;
 };
 
@@ -55,6 +57,7 @@ export function FamilyPulseScreen({ user }: { user: User }) {
                 .getParent<NavigationProp<RootStackParamList>>(ROOT_STACK_ID)
                 ?.navigate('AccessibilitySettings')
             }
+            onOpenPrivacy={() => navigation.navigate('PrivacySettings')}
             onCircleLost={() => {
               void clearOwnFamilyCircleId(user.uid).catch(() => undefined);
               adoptCircle(null);
@@ -107,6 +110,9 @@ export function FamilyPulseScreen({ user }: { user: User }) {
             }}
           />
         )}
+      </Stack.Screen>
+      <Stack.Screen name="PrivacySettings" options={{ headerShown: true, title: 'Privacy' }}>
+        {() => <PrivacySettingsScreen uid={user.uid} />}
       </Stack.Screen>
       <Stack.Screen name="UpgradeAccount" options={{ headerShown: true, title: 'Your account' }}>
         {({ navigation }) => (

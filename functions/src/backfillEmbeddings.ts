@@ -1,6 +1,7 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { getFirestore } from 'firebase-admin/firestore';
 import { GoogleGenAI } from '@google/genai';
+import { hasAiPhotoAccess } from './aiPhotoAccess';
 import { enrichPhotoMemory } from './geminiEnrichment';
 import { GEMINI_API_KEY } from './enrichMemory';
 
@@ -37,7 +38,7 @@ export const backfillEmbeddings = onRequest(
 
     for (const docSnap of snapshot.docs) {
       const memory = docSnap.data();
-      if (memory.embedding) {
+      if (memory.embedding || !(await hasAiPhotoAccess(memory.uploadedBy))) {
         skipped++;
         continue;
       }

@@ -24,6 +24,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import type { RootStackParamList } from '../../navigation/RootStackNavigator';
+import { useAiPhotoAccess } from '../../hooks/useAiPhotoAccess';
 import { useMySpaceMemories } from '../../hooks/useMySpaceMemories';
 import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
@@ -83,6 +84,11 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
   const { state: overviewState } = useFamilyCircleOverview(circleId);
   const groupsState = useMemoryGroups(circleId);
   const memoriesState = useMySpaceMemories(user.uid, circleId);
+
+  // Enrichment is gated server-side too; this keeps the app from offering a
+  // sort that would come back empty.
+  const { state: aiAccessState } = useAiPhotoAccess(user.uid);
+  const aiSortAvailable = aiAccessState.status !== 'ready' || aiAccessState.enabled;
 
   // Larger text needs more room per row, so the grid drops from 3 columns
   // to 2 once the text size setting is above Standard.
@@ -218,7 +224,7 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
         .filter((id): id is string => id != null);
 
       let didSort = false;
-      if (photoIdsToSort.length > 0) {
+      if (photoIdsToSort.length > 0 && aiSortAvailable) {
         setUploadMode('organizing');
         try {
           await waitForEnrichment(photoIdsToSort);
@@ -404,19 +410,21 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
               <Ionicons name="albums-outline" size={22} color={colors.textPrimary} />
               <Text style={styles.selectionBarButtonLabel}>Move</Text>
             </Pressable>
-            <Pressable
-              onPress={handleAutoSort}
-              style={styles.selectionBarButton}
-              disabled={deleting || autoSorting}
-              hitSlop={8}
-            >
-              {autoSorting ? (
-                <ActivityIndicator color={colors.textPrimary} />
-              ) : (
-                <Ionicons name="sparkles-outline" size={22} color={colors.textPrimary} />
-              )}
-              <Text style={styles.selectionBarButtonLabel}>Auto-Sort</Text>
-            </Pressable>
+            {aiSortAvailable && (
+              <Pressable
+                onPress={handleAutoSort}
+                style={styles.selectionBarButton}
+                disabled={deleting || autoSorting}
+                hitSlop={8}
+              >
+                {autoSorting ? (
+                  <ActivityIndicator color={colors.textPrimary} />
+                ) : (
+                  <Ionicons name="sparkles-outline" size={22} color={colors.textPrimary} />
+                )}
+                <Text style={styles.selectionBarButtonLabel}>Auto-Sort</Text>
+              </Pressable>
+            )}
             <Pressable onPress={handleDelete} style={styles.selectionBarButton} disabled={deleting} hitSlop={8}>
               {deleting ? (
                 <ActivityIndicator color={colors.error} />

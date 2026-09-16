@@ -1,6 +1,6 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
-import { ensureUserDocument, getFamilyCircleId } from '../users';
+import { ensureUserDocument, getFamilyCircleId, setAiPhotoAccessEnabled } from '../users';
 
 jest.mock('../firebase', () => ({ firestore: { __mockFirestore: true } }));
 
@@ -8,12 +8,14 @@ jest.mock('firebase/firestore', () => ({
   doc: jest.fn(() => ({ __mockDocRef: true })),
   getDoc: jest.fn(),
   setDoc: jest.fn(),
+  updateDoc: jest.fn(),
   serverTimestamp: jest.fn(() => '__mockServerTimestamp'),
 }));
 
 const mockDoc = doc as jest.Mock;
 const mockGetDoc = getDoc as jest.Mock;
 const mockSetDoc = setDoc as jest.Mock;
+const mockUpdateDoc = updateDoc as jest.Mock;
 
 function fakeUser(overrides: Partial<User> = {}): User {
   return { uid: 'abc123', displayName: null, email: null, photoURL: null, ...overrides } as User;
@@ -23,6 +25,7 @@ beforeEach(() => {
   mockDoc.mockClear();
   mockGetDoc.mockReset();
   mockSetDoc.mockReset();
+  mockUpdateDoc.mockReset();
 });
 
 describe('ensureUserDocument', () => {
@@ -93,9 +96,24 @@ describe('ensureUserDocument', () => {
         displayName: 'Layla',
         photoUrl: 'https://example.com/p.jpg',
         familyCircleId: null,
+        aiPhotoAccessEnabled: true,
         createdAt: '__mockServerTimestamp',
         updatedAt: '__mockServerTimestamp',
       },
+    );
+  });
+});
+
+describe('setAiPhotoAccessEnabled', () => {
+  it('writes the flag and bumps updatedAt', async () => {
+    mockUpdateDoc.mockResolvedValue(undefined);
+
+    await setAiPhotoAccessEnabled('abc123', false);
+
+    expect(mockDoc).toHaveBeenCalledWith({ __mockFirestore: true }, 'users', 'abc123');
+    expect(mockUpdateDoc).toHaveBeenCalledWith(
+      { __mockDocRef: true },
+      { aiPhotoAccessEnabled: false, updatedAt: '__mockServerTimestamp' },
     );
   });
 });
