@@ -22,12 +22,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { User } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import type { RootStackParamList } from '../../navigation/RootStackNavigator';
 import { useMySpaceMemories } from '../../hooks/useMySpaceMemories';
 import { useFamilyCircleMembership } from '../../hooks/useFamilyCircleMembership';
 import { useFamilyCircleOverview } from '../../hooks/useFamilyCircleOverview';
 import { useMemoryGroups } from '../../hooks/useMemoryGroups';
 import { deleteMemory, moveMemoryToGroup, uploadBatchedMemories } from '../../services/memories';
+import { categorizeMemories } from '../../services/ai';
+import { firestore } from '../../services/firebase';
 import type { Memory } from '../../types/memory';
 import { colors, spacing, typography } from '../../theme';
 import { BulkUploadScreen, type CategorizedPhoto } from '../upload/BulkUploadScreen';
@@ -42,6 +45,25 @@ interface TimelineScreenProps {
 const numColumns = 3;
 const screenWidth = Dimensions.get('window').width;
 const imageSize = screenWidth / numColumns;
+
+const AUTO_SORT_POLL_MS = 2000;
+const AUTO_SORT_MAX_WAIT_MS = 20000;
+
+// Freshly-uploaded photos start out aiStatus: 'pending' — give enrichment a
+// window to finish so auto-sort has an aiStory to work with. Anything still
+// pending past the timeout is just skipped server-side, not blocked on.
+async function waitForEnrichment(memoryIds: string[]): Promise<void> {
+  let pending = memoryIds;
+  const deadline = Date.now() + AUTO_SORT_MAX_WAIT_MS;
+
+  while (pending.length > 0 && Date.now() < deadline) {
+    const snaps = await Promise.all(pending.map((id) => getDoc(doc(firestore, 'memories', id))));
+    pending = pending.filter((_, i) => snaps[i]?.data()?.aiStatus === 'pending');
+    if (pending.length > 0) {
+      await new Promise((resolve) => setTimeout(resolve, AUTO_SORT_POLL_MS));
+    }
+  }
+}
 
 function formatDuration(seconds: number) {
   const total = Math.round(seconds);
@@ -91,9 +113,11 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
   const [moving, setMoving] = useState(false);
 
   // Bulk Upload State
-  const [uploadMode, setUploadMode] = useState<'idle' | 'selecting' | 'uploading' | 'done'>('idle');
+  const [uploadMode, setUploadMode] = useState<'idle' | 'selecting' | 'uploading' | 'organizing' | 'done'>('idle');
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [uploadResult, setUploadResult] = useState({ uploaded: 0, failed: 0 });
+  const [sortResult, setSortResult] = useState<{ assigned: number; newGroupsCreated: number } | null>(null);
+  const [autoSorting, setAutoSorting] = useState(false);
 
   // Pop animation: trigger LayoutAnimation when memory count changes
   const prevCountRef = useRef(0);
@@ -163,6 +187,7 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
     if (!circleId) return;
     setUploadMode('uploading');
     setUploadProgress({ current: 0, total: photos.length });
+    setSortResult(null);
 
     try {
       const result = await uploadBatchedMemories(
@@ -179,13 +204,63 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
         (current, total) => setUploadProgress({ current, total }),
       );
       setUploadResult(result);
+
+      // Only photos still sitting in My Space are worth auto-sorting — the
+      // user may have already assigned some straight to an album above.
+      const photoIdsToSort = photos
+        .map((p, i) => (p.type === 'photo' && p.selectedGroupId === 'my-space' ? result.ids[i] : null))
+        .filter((id): id is string => id != null);
+
+      let didSort = false;
+      if (photoIdsToSort.length > 0) {
+        setUploadMode('organizing');
+        try {
+          await waitForEnrichment(photoIdsToSort);
+          const summary = await categorizeMemories(circleId, photoIdsToSort);
+          if (summary.assigned > 0) {
+            setSortResult({ assigned: summary.assigned, newGroupsCreated: summary.newGroupsCreated });
+            didSort = true;
+          }
+        } catch (e) {
+          console.error('Auto-sort after bulk upload failed', e);
+        }
+      }
+
       setUploadMode('done');
-      // Give failures a beat longer to be read than a clean run needs.
-      setTimeout(() => setUploadMode('idle'), result.failed > 0 ? 4000 : 2000);
+      // Give failures (and a sort summary) a beat longer to be read.
+      setTimeout(() => setUploadMode('idle'), result.failed > 0 || didSort ? 4000 : 2000);
     } catch (e) {
       console.error('Upload failed', e);
       Alert.alert('Upload failed', 'Your memories could not be uploaded. Please try again.');
       setUploadMode('idle');
+    }
+  }
+
+  async function handleAutoSort() {
+    if (selectedIds.size === 0 || !circleId) return;
+    setAutoSorting(true);
+    try {
+      const summary = await categorizeMemories(circleId, [...selectedIds]);
+      clearSelection();
+      const parts: string[] = [];
+      if (summary.assigned > 0) {
+        parts.push(
+          `Sorted ${summary.assigned} ${summary.assigned === 1 ? 'photo' : 'photos'} into ${
+            summary.newGroupsCreated > 0
+              ? `${summary.newGroupsCreated} new album${summary.newGroupsCreated === 1 ? '' : 's'}`
+              : 'existing albums'
+          }.`,
+        );
+      }
+      if (summary.skipped > 0) {
+        parts.push(`${summary.skipped} skipped (not analyzed yet, or no good match).`);
+      }
+      Alert.alert('Auto-Sort', parts.length > 0 ? parts.join('\n') : 'Nothing to sort.');
+    } catch (e) {
+      console.error('Auto-sort failed', e);
+      Alert.alert('Error', 'Failed to auto-sort the selected memories.');
+    } finally {
+      setAutoSorting(false);
     }
   }
 
@@ -316,6 +391,19 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
               <Ionicons name="albums-outline" size={22} color={colors.textPrimary} />
               <Text style={styles.selectionBarButtonLabel}>Move</Text>
             </Pressable>
+            <Pressable
+              onPress={handleAutoSort}
+              style={styles.selectionBarButton}
+              disabled={deleting || autoSorting}
+              hitSlop={8}
+            >
+              {autoSorting ? (
+                <ActivityIndicator color={colors.textPrimary} />
+              ) : (
+                <Ionicons name="sparkles-outline" size={22} color={colors.textPrimary} />
+              )}
+              <Text style={styles.selectionBarButtonLabel}>Auto-Sort</Text>
+            </Pressable>
             <Pressable onPress={handleDelete} style={styles.selectionBarButton} disabled={deleting} hitSlop={8}>
               {deleting ? (
                 <ActivityIndicator color={colors.error} />
@@ -352,7 +440,10 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
         />
       </Modal>
 
-      <Modal visible={uploadMode === 'uploading' || uploadMode === 'done'} animationType="fade">
+      <Modal
+        visible={uploadMode === 'uploading' || uploadMode === 'organizing' || uploadMode === 'done'}
+        animationType="fade"
+      >
         {uploadMode === 'done' ? (
           <View style={[styles.screen, styles.centered]}>
             <Ionicons
@@ -367,6 +458,19 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
               {uploadResult.uploaded} {uploadResult.uploaded === 1 ? 'memory' : 'memories'} added
               {uploadResult.failed > 0 ? ` · ${uploadResult.failed} failed` : ''}
             </Text>
+            {sortResult && (
+              <Text style={styles.successSubtitle}>
+                Sorted {sortResult.assigned} into{' '}
+                {sortResult.newGroupsCreated > 0
+                  ? `${sortResult.newGroupsCreated} new album${sortResult.newGroupsCreated === 1 ? '' : 's'}`
+                  : 'existing albums'}
+              </Text>
+            )}
+          </View>
+        ) : uploadMode === 'organizing' ? (
+          <View style={[styles.screen, styles.centered]}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.successTitle}>Sorting into albums…</Text>
           </View>
         ) : (
           <UploadProgressScreen current={uploadProgress.current} total={uploadProgress.total} />
