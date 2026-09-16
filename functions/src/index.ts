@@ -7,3 +7,4 @@ export { backfillEmbeddings } from './backfillEmbeddings';
 export { migrateEmbeddingField } from './migrateEmbeddingField';
 export { retryStuckEnrichment } from './retryStuckEnrichment';
 export { searchMemories } from './searchMemories';
+export { categorizeMemories } from './categorizeMemories';
