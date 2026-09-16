@@ -112,6 +112,36 @@ describe('users rules', () => {
     );
   });
 
+  it('lets a user turn AI photo access off', async () => {
+    const db = testEnv.authenticatedContext(ALICE).firestore();
+    await setDoc(doc(db, 'users', ALICE), validUser({ aiPhotoAccessEnabled: true }));
+
+    await assertSucceeds(
+      updateDoc(doc(db, 'users', ALICE), {
+        aiPhotoAccessEnabled: false,
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('refuses a non-boolean AI photo access flag', async () => {
+    const db = testEnv.authenticatedContext(ALICE).firestore();
+
+    await assertFails(setDoc(doc(db, 'users', ALICE), validUser({ aiPhotoAccessEnabled: 'yes' })));
+  });
+
+  it('still accepts a document written before the AI photo access flag existed', async () => {
+    const db = testEnv.authenticatedContext(ALICE).firestore();
+    await setDoc(doc(db, 'users', ALICE), validUser());
+
+    await assertSucceeds(
+      updateDoc(doc(db, 'users', ALICE), {
+        displayName: 'Alice Renamed',
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
   it('refuses deleting a user document', async () => {
     const db = testEnv.authenticatedContext(ALICE).firestore();
     await setDoc(doc(db, 'users', ALICE), validUser());
