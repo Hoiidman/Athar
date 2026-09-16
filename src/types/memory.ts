@@ -23,6 +23,8 @@ export interface Memory {
   aiStatus: AiStatus;
   /** Server-only. Set by the enrichment Cloud Function; the client never reads or writes it. */
   embedding?: number[] | null;
+  /** From EXIF GPS at upload time, when the source photo carried it. */
+  location?: { lat: number; lng: number } | null;
   categorizationMethod: CategorizationMethod;
   includeInSlideshow: boolean;
   createdAt: number;
@@ -37,6 +39,8 @@ export interface MemoryGroup {
   title: string;
   category?: MemoryGroupCategory;
   icon?: string | null;
+  /** Centroid of member photos' locations, when auto-sort created this group from geotagged photos. */
+  location?: { lat: number; lng: number } | null;
   startDate: number;
   endDate: number;
   memberIds: string[];
