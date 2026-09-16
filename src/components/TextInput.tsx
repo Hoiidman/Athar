@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,7 +6,8 @@ import {
   type TextInputProps as RNTextInputProps,
   View,
 } from 'react-native';
-import { colors, minTapTarget, spacing, typography } from '../theme';
+import { spacing } from '../theme';
+import { useAppTheme, type AppTheme } from '../hooks/useAppTheme';
 
 interface TextInputProps extends Omit<RNTextInputProps, 'style' | 'placeholderTextColor'> {
   /**
@@ -20,6 +21,8 @@ interface TextInputProps extends Omit<RNTextInputProps, 'style' | 'placeholderTe
 }
 
 export function TextInput({ label, error, helperText, ...inputProps }: TextInputProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [focused, setFocused] = useState(false);
   const hasError = !!error;
   // Errors take priority — showing both at once competes for attention and
@@ -42,7 +45,7 @@ export function TextInput({ label, error, helperText, ...inputProps }: TextInput
         }}
         accessibilityLabel={label}
         accessibilityHint={message}
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={theme.colors.textSecondary}
         style={[
           styles.input,
           focused && styles.inputFocused,
@@ -58,43 +61,45 @@ export function TextInput({ label, error, helperText, ...inputProps }: TextInput
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    gap: spacing.xs / 2,
-  },
-  label: {
-    ...typography.label,
-    color: colors.textPrimary,
-  },
-  input: {
-    ...typography.body,
-    color: colors.textPrimary,
-    minHeight: minTapTarget,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-  },
-  inputFocused: {
-    borderColor: colors.primary,
-    // Widened rather than only recoloured, so focus is still visible to
-    // someone who cannot distinguish the two colours.
-    borderWidth: 2,
-  },
-  inputError: {
-    borderColor: colors.error,
-    borderWidth: 2,
-  },
-  inputDisabled: {
-    opacity: 0.5,
-  },
-  message: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  messageError: {
-    color: colors.error,
-  },
-});
+function createStyles({ colors, typography, minTapTarget }: AppTheme) {
+  return StyleSheet.create({
+    container: {
+      gap: spacing.xs / 2,
+    },
+    label: {
+      ...typography.label,
+      color: colors.textPrimary,
+    },
+    input: {
+      ...typography.body,
+      color: colors.textPrimary,
+      minHeight: minTapTarget,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      backgroundColor: colors.surface,
+    },
+    inputFocused: {
+      borderColor: colors.primary,
+      // Widened rather than only recoloured, so focus is still visible to
+      // someone who cannot distinguish the two colours.
+      borderWidth: 2,
+    },
+    inputError: {
+      borderColor: colors.error,
+      borderWidth: 2,
+    },
+    inputDisabled: {
+      opacity: 0.5,
+    },
+    message: {
+      ...typography.caption,
+      color: colors.textSecondary,
+    },
+    messageError: {
+      color: colors.error,
+    },
+  });
+}
