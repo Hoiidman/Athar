@@ -1,12 +1,7 @@
+import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
-import {
-  accentShadow,
-  colors,
-  controlCornerRadius,
-  minTapTarget,
-  spacing,
-  typography,
-} from '../theme';
+import { accentShadow, controlCornerRadius, spacing } from '../theme';
+import { useAppTheme, type AppTheme } from '../hooks/useAppTheme';
 
 export type ButtonVariant =
   'primary' | 'secondary' | 'destructive' | 'destructiveOutline' | 'quiet';
@@ -31,6 +26,10 @@ export function Button({
   loading = false,
   accessibilityLabel,
 }: ButtonProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const { colors } = theme;
+
   const interactive = !disabled && !loading;
   const labelColor =
     variant === 'secondary'
@@ -69,47 +68,49 @@ export function Button({
   );
 }
 
-const styles = StyleSheet.create({
-  base: {
-    minHeight: minTapTarget,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: controlCornerRadius,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primary: {
-    backgroundColor: colors.primary,
-    ...accentShadow,
-  },
-  secondary: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  destructive: {
-    backgroundColor: colors.error,
-  },
-  destructiveOutline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.error,
-  },
-  quiet: {
-    backgroundColor: 'transparent',
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  inactive: {
-    opacity: 0.4,
-  },
-  label: {
-    ...typography.label,
-  },
-  hint: {
-    ...typography.caption,
-    fontSize: 11,
-    marginTop: 1,
-  },
-});
+function createStyles({ colors, typography, minTapTarget, scale }: AppTheme) {
+  return StyleSheet.create({
+    base: {
+      minHeight: minTapTarget,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: controlCornerRadius,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    primary: {
+      backgroundColor: colors.primary,
+      ...accentShadow,
+    },
+    secondary: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    destructive: {
+      backgroundColor: colors.error,
+    },
+    destructiveOutline: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: colors.error,
+    },
+    quiet: {
+      backgroundColor: 'transparent',
+    },
+    pressed: {
+      opacity: 0.7,
+    },
+    inactive: {
+      opacity: 0.4,
+    },
+    label: {
+      ...typography.label,
+    },
+    hint: {
+      ...typography.caption,
+      fontSize: Math.round(11 * scale),
+      marginTop: 1,
+    },
+  });
+}
