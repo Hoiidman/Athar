@@ -28,8 +28,22 @@ export interface CategorizedPhoto {
   type: "photo" | "video";
   durationSeconds?: number;
   localThumbnailUri?: string;
+  location: { lat: number; lng: number } | null;
   matchedGroupIds: string[];
   selectedGroupId: string;
+}
+
+// Android's EXIF reader returns GPS tags as plain decimal-degree numbers;
+// iOS strips GPS from EXIF for camera-origin photos, so this is best-effort.
+function extractGpsLocation(exif: Record<string, unknown> | null | undefined): { lat: number; lng: number } | null {
+  if (!exif) return null;
+  const rawLat = exif.GPSLatitude;
+  const rawLng = exif.GPSLongitude;
+  if (typeof rawLat !== 'number' || typeof rawLng !== 'number') return null;
+
+  const lat = exif.GPSLatitudeRef === 'S' ? -Math.abs(rawLat) : Math.abs(rawLat);
+  const lng = exif.GPSLongitudeRef === 'W' ? -Math.abs(rawLng) : Math.abs(rawLng);
+  return { lat, lng };
 }
 
 export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenProps) {
@@ -141,6 +155,7 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
         // If multiple matches, we temporarily pick the first one, but the user will need to resolve it.
         // If no matches, falls back to 'my-space'
         const selectedGroupId = matchedGroupIds[0] ?? 'my-space';
+        const location = extractGpsLocation(asset.exif);
 
         processedPhotos.push({
           uri: asset.uri,
@@ -150,6 +165,7 @@ export function BulkUploadScreen({ user, onCancel, onUpload }: BulkUploadScreenP
           durationSeconds,
           localThumbnailUri,
           creationTimeMs,
+          location,
           matchedGroupIds,
           selectedGroupId,
         });

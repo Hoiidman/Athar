@@ -200,6 +200,7 @@ export function TimelineScreen({ user }: TimelineScreenProps) {
           takenAtMs: p.creationTimeMs,
           type: p.type,
           durationSeconds: p.durationSeconds,
+          location: p.location,
         })),
         (current, total) => setUploadProgress({ current, total }),
       );
