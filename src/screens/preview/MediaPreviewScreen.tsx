@@ -808,6 +808,14 @@ export function MediaPreviewScreen({ route, navigation }: Props) {
       return;
     }
 
+    // Only the original uploader can override — Firestore's update rule
+    // rejects anyone else, so editing someone else's shared memory always
+    // saves as a new memory instead of prompting for a choice that would fail.
+    if (editMemory && editMemory.uploadedBy !== user?.uid) {
+      finalizeEdit('new');
+      return;
+    }
+
     Alert.alert('Save changes', 'Override the existing photo, or save as a new one?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Create New', onPress: () => finalizeEdit('new') },

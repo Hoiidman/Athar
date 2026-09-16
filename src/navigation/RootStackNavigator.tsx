@@ -10,6 +10,7 @@ export interface EditMemoryParam {
   uri: string;
   kind: 'photo' | 'video';
   groupId: string;
+  uploadedBy: string;
 }
 
 export type RootStackParamList = {
